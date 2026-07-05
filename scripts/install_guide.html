@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Stock Plan Manager — Install Guide</title>
+  <style>
+    body {
+      font-family: -apple-system, system-ui, sans-serif;
+      max-width: 720px;
+      margin: 3rem auto;
+      padding: 0 1.5rem;
+      color: #1d1d1f;
+      line-height: 1.55;
+      background: #fafafa;
+    }
+    h1 { font-size: 1.75rem; margin-bottom: 0.25rem; }
+    h2 { font-size: 1.15rem; margin-top: 2.5rem; border-bottom: 1px solid #ddd; padding-bottom: 0.4rem; }
+    .lead { color: #666; margin-bottom: 2rem; }
+    ol { padding-left: 1.5rem; }
+    ol li { margin: 0.65rem 0; }
+    code, .kbd {
+      background: #eee;
+      padding: 0.1rem 0.4rem;
+      border-radius: 4px;
+      font-size: 0.92em;
+    }
+    .callout {
+      background: #fff8e1;
+      border-left: 4px solid #f0b400;
+      padding: 0.9rem 1.1rem;
+      margin: 1rem 0;
+      border-radius: 4px;
+    }
+    .callout strong { color: #8a6500; }
+    .step-heading { font-weight: 600; color: #1d1d1f; }
+    footer { margin-top: 3rem; color: #888; font-size: 0.85rem; text-align: center; }
+  </style>
+</head>
+<body>
+  <h1>Stock Plan Manager</h1>
+  <p class="lead">Quick install for macOS — about 2 minutes.</p>
+
+  <h2>1. Install the app</h2>
+  <ol>
+    <li>The Finder window for the disk image should already be open. If not, double-click <code>StockPlan.dmg</code> in your Downloads folder.</li>
+    <li>Drag the <strong>StockPlan</strong> icon onto the <strong>Applications</strong> shortcut in that window.</li>
+    <li>Eject the disk image: press <span class="kbd">⌘E</span> in Finder, or click the ⏏ next to "StockPlan" in the Finder sidebar.</li>
+  </ol>
+
+  <h2>2. First launch — allow the app</h2>
+  <p>Because Stock Plan Manager isn't signed by an Apple-registered developer, macOS will block the first launch. This is one-time per Mac.</p>
+
+  <ol>
+    <li>Open <strong>Applications</strong> in Finder. Double-click <strong>StockPlan</strong>.</li>
+    <li>macOS will show: <em>"StockPlan can't be opened because Apple cannot check it for malicious software."</em> Click <strong>Done</strong>.</li>
+    <li>Open <strong>System Settings</strong> (Apple menu → System Settings).</li>
+    <li>Click <strong>Privacy &amp; Security</strong> in the sidebar.</li>
+    <li>Scroll down to the <strong>Security</strong> section. You'll see: <em>"StockPlan was blocked to protect your Mac."</em> Click <strong>Open Anyway</strong>.</li>
+    <li>Authenticate with Touch ID or your password.</li>
+    <li>Go back to Applications and double-click <strong>StockPlan</strong> again.</li>
+    <li>You'll see a new dialog with an <strong>Open</strong> button. Click it.</li>
+  </ol>
+
+  <div class="callout">
+    <strong>Important:</strong> Steps 1 and 2 must happen in that order. The "Open Anyway" button only appears in System Settings <em>after</em> you've attempted to launch the app once and gotten the block message.
+  </div>
+
+  <p>After this one-time setup, double-clicking StockPlan launches it normally — no further prompts.</p>
+
+  <h2>3. Using the app</h2>
+  <ol>
+    <li>The first launch opens your browser at <code>http://localhost:4002</code> automatically.</li>
+    <li>The app has no Dock icon — it runs in the background and you interact with it through the browser tab.</li>
+    <li>To stop the server: click the red <strong>Quit</strong> button in the top-right of any page in the app, then close the browser tab.</li>
+  </ol>
+
+  <h2>4. Troubleshooting</h2>
+
+  <p class="step-heading">"StockPlan can't be opened" with no entry in Privacy &amp; Security</p>
+  <p>This happens if the DMG was downloaded through a sandboxed app like WhatsApp, Messages, or Mail. macOS blocks anything downloaded by those apps from being executed, with no override path. <strong>Workaround:</strong> download the DMG using Chrome, Firefox, or directly from the GitHub release page in any browser, then re-install.</p>
+
+  <p class="step-heading">App icon is blank in Finder</p>
+  <p>macOS caches icons. After installing a new version, open Terminal and run:</p>
+  <p><code>touch /Applications/StockPlan.app &amp;&amp; killall Finder &amp;&amp; killall Dock</code></p>
+
+  <p class="step-heading">Browser tab won't load after launching the app</p>
+  <p>The server takes 5–10 seconds to start on first launch (it runs database migrations). Refresh the page. If still failing after 30 seconds, the BEAM process may have crashed — open Activity Monitor, search for <code>beam.smp</code>, kill it, and try again.</p>
+
+  <h2>5. Uninstall</h2>
+  <ol>
+    <li>Stop the server if it's running (Quit button in the app, or kill <code>beam.smp</code> in Activity Monitor).</li>
+    <li>Drag <strong>StockPlan</strong> from Applications to the Trash.</li>
+    <li>Optional — remove your data: in Terminal, run <code>rm -rf ~/.stock_plan</code>. This deletes your portfolio database, profile, and uploaded files.</li>
+  </ol>
+
+  <footer>Stock Plan Manager · single-user local install · your data never leaves your machine.</footer>
+</body>
+</html>

@@ -1,0 +1,15 @@
+# gitleaks configuration (public template)
+#
+# This is the open-source, reusable-by-anyone version of the secret-scan config. The
+# private working repo's project-specific PII rule is intentionally NOT included here --
+# this generic config relies on gitleaks' built-in default rule set (API keys, AWS keys,
+# private keys, etc.) plus a minimal allowlist for this repo's own scan tooling files.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Files that are the scan gate's own definitions, not findings."
+paths = [
+  '''^scripts/pii_scan\.sh$''',
+  '''^\.gitleaks\.toml$''',
+]

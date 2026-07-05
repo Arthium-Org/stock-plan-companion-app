@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Stock Plan Manager — Windows Install Guide</title>
+  <style>
+    body {
+      font-family: "Segoe UI", system-ui, sans-serif;
+      max-width: 720px;
+      margin: 3rem auto;
+      padding: 0 1.5rem;
+      color: #1d1d1f;
+      line-height: 1.55;
+      background: #fafafa;
+    }
+    h1 { font-size: 1.75rem; margin-bottom: 0.25rem; }
+    h2 { font-size: 1.15rem; margin-top: 2.5rem; border-bottom: 1px solid #ddd; padding-bottom: 0.4rem; }
+    .lead { color: #666; margin-bottom: 2rem; }
+    ol { padding-left: 1.5rem; }
+    ol li { margin: 0.65rem 0; }
+    code, .kbd {
+      background: #eee;
+      padding: 0.1rem 0.4rem;
+      border-radius: 4px;
+      font-size: 0.92em;
+    }
+    .callout {
+      background: #fff8e1;
+      border-left: 4px solid #f0b400;
+      padding: 0.9rem 1.1rem;
+      margin: 1rem 0;
+      border-radius: 4px;
+    }
+    .callout strong { color: #8a6500; }
+    .step-heading { font-weight: 600; color: #1d1d1f; }
+    footer { margin-top: 3rem; color: #888; font-size: 0.85rem; text-align: center; }
+  </style>
+</head>
+<body>
+  <h1>Stock Plan Manager — Windows</h1>
+  <p class="lead">Installation guide. About 2 minutes.</p>
+
+  <h2>1. Install the app</h2>
+  <ol>
+    <li>Download <code>StockPlan-Setup.exe</code> from the releases page.</li>
+    <li>Double-click <code>StockPlan-Setup.exe</code> in your Downloads folder.</li>
+  </ol>
+
+  <div class="callout">
+    <strong>SmartScreen warning on first launch:</strong> because Stock Plan Manager
+    isn't signed yet, Windows will show
+    <em>"Windows protected your PC"</em>. Click <strong>More info</strong>,
+    then <strong>Run anyway</strong>. This is one-time per installer download.
+  </div>
+
+  <ol start="3">
+    <li>Step through the installer wizard: <strong>Next → Next → Install</strong>.</li>
+    <li>If prompted by Windows, allow administrator access — this is needed to install
+    into <code>Program Files</code>.</li>
+    <li>The installer silently installs the Microsoft Visual C++ Runtime if your system
+    doesn't have it. This is normal and takes about 10 seconds.</li>
+    <li>When the wizard finishes with <strong>Launch Stock Plan Manager</strong> checked,
+    click <strong>Finish</strong>. Your browser opens automatically at
+    <code>http://localhost:4002</code> within 20 seconds.</li>
+  </ol>
+
+  <h2>2. Using the app</h2>
+  <ol>
+    <li>The app runs in the background — there is no Stock Plan Manager window.
+    You interact with it entirely through your browser tab.</li>
+    <li>To stop the server: click the red <strong>Quit</strong> button in the top-right
+    of any page in the app, then close the browser tab.</li>
+    <li>To start the server again later: open the Start Menu, type
+    <code>Stock Plan Manager</code>, click the app. The browser tab opens automatically.</li>
+  </ol>
+
+  <h2>3. Where your data lives</h2>
+  <p>
+    Stock Plan Manager stores everything on your local machine. Specifically:
+  </p>
+  <ul>
+    <li><code>%USERPROFILE%\.stock_plan\stock_plan.db</code> — your portfolio database
+    (SQLite)</li>
+    <li><code>%USERPROFILE%\.stock_plan\profile.json</code> — your display name</li>
+  </ul>
+  <p>
+    Nothing leaves your PC. The only external network calls are to public stock-price
+    and FX-rate sources (Yahoo Finance, RBI reference rates).
+  </p>
+
+  <h2>4. Troubleshooting</h2>
+
+  <p class="step-heading">Browser tab won't load after install</p>
+  <p>The server takes 5–20 seconds to start on first launch (runs initial database
+  setup). Refresh the page. If it's still failing after a minute, open
+  <strong>Task Manager → Details</strong>, look for any <code>erl.exe</code> /
+  <code>beam.smp</code> processes — if none, re-launch from the Start Menu.</p>
+
+  <p class="step-heading">"Windows protected your PC" with no "Run anyway" button</p>
+  <p>You may have very strict SmartScreen settings. Right-click
+  <code>StockPlan-Setup.exe</code> → <strong>Properties</strong> → bottom of the
+  General tab, tick <strong>Unblock</strong> → OK. Re-run the installer.</p>
+
+  <p class="step-heading">App can't find the database after a Windows account change</p>
+  <p>If you signed in with a different Windows user, the app installed for
+  <em>all users</em> but the data lives in <em>your</em> user profile. Sign back in
+  to the account where you originally created data, or copy
+  <code>.stock_plan\</code> between user profiles.</p>
+
+  <h2>5. Uninstall</h2>
+  <ol>
+    <li>Stop the server: open the app, click <strong>Quit</strong>.</li>
+    <li>Open <strong>Settings → Apps → Installed apps</strong>, find
+    <strong>Stock Plan Manager</strong>, click ⋯ → <strong>Uninstall</strong>.</li>
+    <li>(Optional) remove your data: in File Explorer go to
+    <code>%USERPROFILE%</code>, delete the <code>.stock_plan</code> folder.
+    This deletes the database, profile, and any uploaded files.</li>
+  </ol>
+
+  <footer>Stock Plan Manager · single-user local install · your data never leaves your machine.</footer>
+</body>
+</html>

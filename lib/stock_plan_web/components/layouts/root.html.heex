@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="csrf-token" content={get_csrf_token()} />
+    <.live_title default="StockPlan" suffix=" · Phoenix Framework">
+      {assigns[:page_title]}
+    </.live_title>
+    <link phx-track-static rel="stylesheet" href={~p"/assets/css/app.css"} />
+    <script defer phx-track-static type="text/javascript" src={~p"/assets/js/app.js"}>
+    </script>
+    <script>
+      (() => {
+        const setTheme = (theme) => {
+          if (theme === "system") {
+            localStorage.removeItem("phx:theme");
+            document.documentElement.removeAttribute("data-theme");
+          } else {
+            localStorage.setItem("phx:theme", theme);
+            document.documentElement.setAttribute("data-theme", theme);
+          }
+        };
+        if (!document.documentElement.hasAttribute("data-theme")) {
+          setTheme(localStorage.getItem("phx:theme") || "system");
+        }
+        window.addEventListener("storage", (e) => e.key === "phx:theme" && setTheme(e.newValue || "system"));
+        
+        window.addEventListener("phx:set-theme", (e) => setTheme(e.target.dataset.phxTheme));
+      })();
+    </script>
+  </head>
+  <body>
+    <nav class="navbar bg-base-200 px-4 sticky top-0 z-20">
+      <div class="flex-1">
+        <a href="/" class="text-lg font-bold">Stock Plan Manager</a>
+      </div>
+      <div class="flex gap-2 items-center">
+        <a href="/upload" class="btn btn-ghost btn-sm">Upload</a>
+        <a href="/portfolio" class="btn btn-ghost btn-sm">Portfolio</a>
+        <a href="/tax" class="btn btn-ghost btn-sm">Tax Centre</a>
+        <a href="/sell" class="btn btn-ghost btn-sm">Sell Advisor</a>
+        <a href="/history" class="btn btn-ghost btn-sm">History</a>
+        <form
+          action="/quit"
+          method="post"
+          onsubmit="return confirm('Stop the Stock Plan Manager server?')"
+          class="ml-2"
+        >
+          <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+          <button type="submit" class="btn btn-ghost btn-sm text-error">Quit</button>
+        </form>
+      </div>
+    </nav>
+    <%= if assigns[:upload_banner] do %>
+      <StockPlanWeb.Layouts.upload_banner last_upload_at={@upload_banner.last_upload_at} />
+    <% end %>
+    <%= if assigns[:update_banner] do %>
+      <StockPlanWeb.Layouts.update_banner
+        state={@update_banner}
+        releases_url={"https://github.com/#{Application.get_env(:stock_plan, :update_check_repo_slug)}/releases/latest"}
+      />
+    <% end %>
+    <StockPlanWeb.Layouts.flash_group flash={@flash} />
+    {@inner_content}
+    <footer class="text-xs text-base-content/40 border-t border-base-300/40 px-4 py-3 text-center sticky bottom-0 z-20 bg-base-200">
+      Not tax or financial advice — see LICENSE.
+      <form action="/updates/check" method="post" class="inline">
+        <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+        <button type="submit" class="link ml-2">Check for updates</button>
+      </form>
+      <a href="mailto:contact@arthium.org?subject=Stock Plan Manager — Issue" class="link ml-2">
+        Report an issue
+      </a>
+    </footer>
+  </body>
+</html>

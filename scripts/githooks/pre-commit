@@ -1,0 +1,127 @@
+#!/usr/bin/env bash
+# Deterministic, offline, staged-file PII pre-commit hook (Phase 4.2, D-06).
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+cd "$ROOT"
+
+if [ -t 1 ]; then
+  RED=$'\033[0;31m'; GREEN=$'\033[0;32m'; NC=$'\033[0m'
+else
+  RED=""; GREEN=""; NC=""
+fi
+
+# --- Source REAL_TOKENS + SELF_FILES from scripts/pii_scan.sh at runtime (single
+# source of truth — reuses the extract-array awk idiom from publish_snapshot.sh). ---
+extract_array() {
+  local file="$1" name="$2"
+  awk -v name="$name" '
+    index($0, name "=(") == 1 { inarr = 1; next }
+    inarr && /^\)/ { inarr = 0; next }
+    inarr { print }
+  ' "$file" | grep -oE '"[^"]*"' | sed 's/^"//; s/"$//'
+}
+
+REAL_TOKENS=()
+while IFS= read -r tok; do
+  [ -n "$tok" ] && REAL_TOKENS+=("$tok")
+done < <(extract_array "$ROOT/scripts/pii_scan.sh" "REAL_TOKENS")
+
+if [ "${#REAL_TOKENS[@]}" -eq 0 ]; then
+  echo "${RED}ERROR${NC}: could not extract REAL_TOKENS from scripts/pii_scan.sh." >&2
+  echo "Refusing to run without a known token to guard against." >&2
+  exit 1
+fi
+
+SELF_FILES=()
+while IFS= read -r sf; do
+  [ -n "$sf" ] && SELF_FILES+=("$sf")
+done < <(extract_array "$ROOT/scripts/pii_scan.sh" "SELF_FILES")
+
+# Reviewed doc-binary allowlist — exact paths exempt from the *.xlsx/*.pdf extension block
+# (see pii_scan.sh DOC_BINARY_ALLOWLIST for the human-review rationale). Single source of truth.
+DOC_BINARY_ALLOWLIST=()
+while IFS= read -r ab; do
+  [ -n "$ab" ] && DOC_BINARY_ALLOWLIST+=("$ab")
+done < <(extract_array "$ROOT/scripts/pii_scan.sh" "DOC_BINARY_ALLOWLIST")
+
+# --- Config: code-tree PII paths (mirrors pii_scan.sh CODE_TREE_FORBIDDEN, D-07) ---
+CODE_TREE_FORBIDDEN=(
+  "docs/Sample-Data/"
+  "docs/Etrade-Screenshots/"
+  "docs/Issues/"
+  "priv/static/uploads/"
+)
+
+is_self_file() {
+  local f="$1" s
+  for s in "${SELF_FILES[@]}"; do
+    [[ "$f" == "$s" ]] && return 0
+  done
+  return 1
+}
+
+is_code_tree_forbidden() {
+  local f="$1" p
+  for p in "${CODE_TREE_FORBIDDEN[@]}"; do
+    [[ "$f" == "$p"* ]] && return 0
+  done
+  return 1
+}
+
+is_doc_binary_allowlisted() {
+  local f="$1" a
+  for a in "${DOC_BINARY_ALLOWLIST[@]:-}"; do
+    [[ "$f" == "$a" ]] && return 0
+  done
+  return 1
+}
+
+# NUL-delimited staged set — never the whole tree.
+STAGED=()
+while IFS= read -r -d '' f; do
+  STAGED+=("$f")
+done < <(git diff --cached --name-only --diff-filter=ACM -z)
+
+FOUND=0
+
+for f in "${STAGED[@]}"; do
+  is_self_file "$f" && continue
+
+  if is_code_tree_forbidden "$f"; then
+    echo "${RED}BLOCKED${NC}: staged path under forbidden code-tree PII prefix: $f" >&2
+    FOUND=1
+    continue
+  fi
+
+  case "$f" in
+    *.xlsx|*.pdf)
+      # Real broker export binaries are never allowed in the code tree — block
+      # unconditionally, don't rely on token content (unzip may be unavailable).
+      # Exception: the small, human-reviewed doc allowlist (see pii_scan.sh).
+      if is_doc_binary_allowlisted "$f"; then
+        continue
+      fi
+      echo "${RED}BLOCKED${NC}: staged broker export binary: $f" >&2
+      FOUND=1
+      continue
+      ;;
+  esac
+
+  [ -f "$f" ] || continue
+
+  for tok in "${REAL_TOKENS[@]}"; do
+    if grep -Iq -- "$tok" "$f" 2>/dev/null; then
+      echo "${RED}BLOCKED${NC}: token '$tok' found in staged file: $f" >&2
+      FOUND=1
+    fi
+  done
+done
+
+if [ "$FOUND" -eq 1 ]; then
+  echo "${RED}pre-commit: aborting commit — PII found in staged files.${NC}" >&2
+  exit 1
+fi
+
+echo "${GREEN}pre-commit: OK — no PII found in staged files.${NC}"
+exit 0

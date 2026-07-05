@@ -1,0 +1,29 @@
+{
+  "ADBE": {
+    "legal_name": "Adobe Inc.",
+    "display_name": "Adobe",
+    "country": "United States of America",
+    "country_code": "2",
+    "address": "345 Park Ave; San Jose; CA; USA",
+    "zip": "95110",
+    "nature_of_entity": "Company"
+  },
+  "CRM": {
+    "legal_name": "Salesforce, Inc.",
+    "display_name": "Salesforce",
+    "country": "United States of America",
+    "country_code": "2",
+    "address": "Salesforce Tower; 415 Mission St; San Francisco; CA; USA",
+    "zip": "94105",
+    "nature_of_entity": "Company"
+  },
+  "MSFT": {
+    "legal_name": "Microsoft Corporation",
+    "display_name": "Microsoft",
+    "country": "United States of America",
+    "country_code": "2",
+    "address": "One Microsoft Way; Redmond; WA; USA",
+    "zip": "98052",
+    "nature_of_entity": "Company"
+  }
+}

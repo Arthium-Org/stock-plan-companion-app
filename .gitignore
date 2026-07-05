@@ -1,0 +1,86 @@
+# The directory Mix will write compiled artifacts to.
+/_build/
+
+# If you run "mix test --cover", coverage assets end up here.
+/cover/
+
+# The directory Mix downloads your dependencies sources to.
+/deps/
+
+# Where 3rd-party dependencies like ExDoc output generated docs.
+/doc/
+
+# Ignore .fetch files in case you like to edit your project deps locally.
+/.fetch
+
+# If the VM crashes, it generates a dump, let's ignore it too.
+erl_crash.dump
+
+# Also ignore archive artifacts (built via "mix archive.build").
+*.ez
+
+# Temporary files, for example, from tests.
+/tmp/
+
+# Ignore package tarball (built via "mix hex.build").
+stock_plan-*.tar
+
+# Ignore assets that are produced by build tools.
+/priv/static/assets/
+
+# Ignore digested assets cache.
+/priv/static/cache_manifest.json
+
+# In case you use Node.js/npm, you want to ignore these.
+npm-debug.log
+/assets/node_modules/
+
+# Database files
+*.db
+*.db-*
+
+.DS_Store
+**/.DS_Store
+
+# Excel lock files (created when an .xlsx is open in Excel)
+~$*.xlsx
+
+# Mac release build artifacts (built via scripts/build_release.sh)
+/release/
+
+# Windows installer build artifacts (built via scripts/build_release_windows.ps1)
+/scripts/StockPlan.exe
+/scripts/vcredist_x64.exe
+/scripts/*.obj
+/scripts/StockPlan.exp
+/scripts/StockPlan.lib
+/launcher_win.obj
+/docs/Logo.ico
+
+# --- PII exclusion set (never publish) ---
+# These paths contain real financial data / real PII (verified 2026-07-03, see
+# .planning/phases/01-pii-scrub-anonymized-test-fixtures/01-CONTEXT.md). Already-tracked
+# files are NOT retroactively removed by adding a pattern here — this block only prevents
+# FUTURE re-commits of new files under these paths. The Phase 3 fresh-history public
+# snapshot is built by excluding these same paths at snapshot time, so this list must stay
+# in sync with the verified exclusion set in 01-CONTEXT.md.
+#
+# NOTE: .planning/, .claude/, and .cursor/ are committed here (public-primary model, D-04/D-01).
+# A committed .gitignore is self-propagating — it travels with every clone, so any contributor
+# who clones the public repo and runs GSD gets their .planning/ auto-ignored with zero setup.
+# This is the mechanism that keeps D-01 (keep internal planning artifacts private) real. The
+# "already-tracked files are NOT retroactively removed" caveat above still holds (git behavior);
+# it does not matter here because a fresh public clone never had these paths committed to begin
+# with, so it starts clean.
+docs/Sample-Data/
+docs/Etrade-Screenshots/
+docs/Issues/
+.planning/
+.claude/
+.cursor/
+
+# Runtime user uploads (real user files land here at runtime; never publish)
+/priv/static/uploads/
+
+# Scratch dir used by scripts/publish_snapshot.sh (Phase 3 clean-history snapshot build)
+/.gsd-scratch/
