@@ -30,7 +30,7 @@ let accentColor = NSColor(red: 0.20, green: 0.45, blue: 0.85, alpha: 1.0)
 
 drawCentered("Install Stock Plan Manager",
              y: 455, font: NSFont.systemFont(ofSize: 20, weight: .semibold), color: titleColor)
-drawCentered("1.  Drag StockPlan into the Applications folder",
+drawCentered("1.  Drag StockPlanCompanion into the Applications folder",
              y: 410, font: NSFont.systemFont(ofSize: 13, weight: .medium), color: bodyColor)
 
 accentColor.setStroke()
@@ -47,7 +47,7 @@ arrow.move(to: NSPoint(x: endX, y: arrowY))
 arrow.line(to: NSPoint(x: endX - 18, y: arrowY - 12))
 arrow.stroke()
 
-drawCentered("2.  Open Applications and double-click StockPlan",
+drawCentered("2.  Open Applications and double-click StockPlanCompanion",
              y: 200, font: NSFont.systemFont(ofSize: 13, weight: .medium), color: bodyColor)
 drawCentered("3.  If macOS blocks it:  System Settings → Privacy & Security → Open Anyway",
              y: 170, font: NSFont.systemFont(ofSize: 12, weight: .regular), color: bodyColor)
