@@ -90,12 +90,17 @@ Mac-side build steps live in `docs/distribution/README-Mac.md`; this section
 is the single place that documents the end-to-end release flow (D-04).
 Release creation for launch is a **manual** step, not a CI build matrix (D-03).
 
-### 4.1 Build both artifacts
+### 4.1 Build the artifacts
 
-- **Windows:** run `.\scripts\build_release_windows.ps1` per §2 above →
-  produces `release\StockPlan-Setup.exe`.
-- **Mac:** build the Mac artifact per `docs/distribution/README-Mac.md` →
-  produces `stock_plan_mac.tar.gz`.
+- **Mac (primary today):** on the friend's Apple-Silicon Mac, run
+  `scripts/build_release.sh` with the signing env vars set (§4.2) → produces a
+  signed, notarized, stapled `release/StockPlanCompanion-arm64.dmg`.
+- **Windows (when a build exists):** run `.\scripts\build_release_windows.ps1`
+  per §2 above → produces `release\StockPlan-Setup.exe`.
+
+A **Mac-only release is valid** — publish the Windows installer in a later
+release once it is built. The in-app update check depends only on the release
+**tag**, never on which artifacts are attached (§4.6).
 
 ### 4.2 Mac code-sign + notarize (Model A — friend signs, no credentials shared)
 
@@ -104,19 +109,33 @@ signs on his own Mac using his own Apple Developer ID Application
 certificate. His certificate, private key, and Apple credentials **never
 leave his machine** and are never shared with the maintainer (D-01b).
 
-On the friend's Mac, after building the `.app`:
+`scripts/build_release.sh` performs the entire signed-DMG build in **one
+command** when given the friend's identity + notary credentials. It Mix-releases
+the app, assembles the `.app`, signs **every** nested Mach-O (ERTS binaries,
+NIFs, the bundled libcrypto) inside-out with the hardened runtime, notarizes +
+staples the `.app`, builds the styled DMG, then signs + notarizes + staples the
+DMG container itself. Run it on the friend's Mac:
 
 ```bash
-codesign --options runtime --sign "Developer ID Application: <Name> (<TeamID>)" \
-  /path/to/StockPlan.app
-
-xcrun notarytool submit /path/to/StockPlan.app.zip --wait \
+# One-time: store notary credentials in the keychain (so they aren't passed each run)
+xcrun notarytool store-credentials stockplan-notary \
   --apple-id "<apple-id>" --team-id "<TeamID>" --password "<app-specific-password>"
 
-xcrun stapler staple /path/to/StockPlan.app
+# Each release:
+SIGN_IDENTITY="Developer ID Application: <Name> (<TeamID>)" \
+NOTARY_KEYCHAIN_PROFILE="stockplan-notary" \
+  ./scripts/build_release.sh
+# → release/StockPlanCompanion-arm64.dmg  (signed + notarized + stapled)
 ```
 
-Then re-package the stapled `.app` into `stock_plan_mac.tar.gz` for upload.
+The Developer ID certificate, private key, and Apple credentials **never leave
+the friend's machine** (D-01b) — only the finished DMG is handed back, or the
+friend (who has repo admin) attaches it to the Release directly. Without
+`SIGN_IDENTITY` the script falls back to ad-hoc signing for local dev builds
+(not notarizable — never ship those). Build prerequisites on the friend's Mac:
+the asdf toolchain from `.tool-versions`, and a macOS-11-compatible
+`~/openssl-compat/lib/libcrypto.3.dylib` (see the OpenSSL note in
+`scripts/build_release.sh`).
 
 **Unsigned fallback (not launch-blocking):** if the friend is unavailable for
 a given release, ship the **unsigned** Mac artifact instead and document the
@@ -152,15 +171,27 @@ git push origin v1.5.0
 
 ```bash
 gh release create v1.5.0 \
-  release/StockPlan-Setup.exe \
-  release/stock_plan_mac.tar.gz \
+  release/StockPlanCompanion-arm64.dmg \
   --repo Arthium-Org/stock-plan-companion-app \
   --title "v1.5.0" \
-  --notes "<release notes — see template below>"
+  --notes-file <notes.md>
+# Append release/StockPlan-Setup.exe to the same command once a Windows build exists.
 ```
 
 (Requires `gh auth login` first, with admin/write access to
 `Arthium-Org/stock-plan-companion-app`.)
+
+**Stable asset filename (do not version it):** the Mac DMG is always named
+`StockPlanCompanion-arm64.dmg` — no version in the name — so the landing page's
+permanent download link resolves to the newest release forever:
+
+```
+https://github.com/Arthium-Org/stock-plan-companion-app/releases/latest/download/StockPlanCompanion-arm64.dmg
+```
+
+A version-stamped filename would break that link on every release. The version
+is carried by the git tag and `mix.exs`, not the filename. `build_release.sh`
+emits this exact name; keep it identical every release.
 
 ### 4.6 Release notes template + severity-marker convention
 
@@ -196,11 +227,19 @@ whatever "What's new" / changelog format is useful.
 
 ```bash
 gh release view v1.5.0 --repo Arthium-Org/stock-plan-companion-app
-curl -s https://api.github.com/repos/Arthium-Org/stock-plan-companion-app/releases/latest
+curl -s -o /dev/null -w "%{http_code}\n" \
+  https://api.github.com/repos/Arthium-Org/stock-plan-companion-app/releases/latest
+# Gatekeeper + notarization end-to-end on the published DMG:
+curl -sL -o /tmp/dl.dmg \
+  https://github.com/Arthium-Org/stock-plan-companion-app/releases/latest/download/StockPlanCompanion-arm64.dmg
+spctl -a -vvv -t open --context context:primary-signature /tmp/dl.dmg
+xcrun stapler validate /tmp/dl.dmg
 ```
 
-Confirm both artifacts are listed and `releases/latest` returns the new tag
-(a 404 here means no releases exist yet on the repo).
+Confirm the DMG is listed, `releases/latest` returns **200** with the new tag
+(a 404 means no full release exists yet — pre-releases don't count), and the
+Gatekeeper assessment on the downloaded DMG reads `accepted / Notarized
+Developer ID`.
 
 ---
 
