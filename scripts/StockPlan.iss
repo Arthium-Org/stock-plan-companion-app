@@ -12,8 +12,8 @@
 #ifndef MyAppVersion
   #define MyAppVersion "0.0.0-dev"
 #endif
-#define MyAppPublisher "Kiran Vakati"
-#define MyAppURL "https://github.com/kvakatidev/Wealth-management-apps-releases"
+#define MyAppPublisher "Arthium"
+#define MyAppURL "https://github.com/Arthium-Org/stock-plan-companion-app"
 #define MyAppExeName "StockPlan.exe"
 
 [Setup]
