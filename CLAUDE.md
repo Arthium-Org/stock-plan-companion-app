@@ -65,7 +65,7 @@ Gold (derived views, rebuildable, uses Silver FX data)
 4. **1 ACTIVE ingestion per account.** New upload archives previous, rebuilds Silver + Gold. Guard rail (future): detect large data drift between uploads (e.g., significant grant count or total quantity change) and warn user before overwriting.
 5. **Dual FX model.** Event-time FX stored on Silver events; current FX computed dynamically at Gold/UI.
 6. **Income split.** Realized income (vested events) lives in Silver. Projected income has two tiers: (a) projected at Grant FMV and Vest FMV — deterministic, can be stored in Gold; (b) projected at current stock price — must be computed on the fly at UI layer, never stored. Current-price projections are NOT financial facts.
-7. **SELL events in schema now.** SELL ingestion via Trade Confirmation PDF upload (extract sell events from E*Trade trade confirmation PDFs). Schema supports SELL from day one.
+7. **SELL events in schema now.** SELL data ingested from the G&L_Expanded XLSX (sale price, proceeds, fees). Schema supports SELL from day one.
 8. **"stock_plan" naming.** Industry standard: E*Trade ("StockPlan Connect"), Fidelity ("Stock Plan Services"), Schwab ("Stock Plan Services") all use "Stock Plan". ESOP is one of three plan types, not the umbrella term. Plan types: `RSU` / `ESPP` / `STOCK_OPTION`.
 
 ---
@@ -287,7 +287,7 @@ Sell executions. User-triggered.
 | sale_price | SafeDecimal | Price per share (nullable — nil from Benefit History, filled by G&L/Trade Conf) |
 | sale_fx_rate | SafeDecimal | USD/INR on sale date |
 | proceeds | SafeDecimal | total_quantity × sale_price |
-| metadata_json | TEXT | Broker fees, trade confirmation reference |
+| metadata_json | TEXT | Broker fees, G&L reference |
 | timestamps() | :utc_datetime_usec | inserted_at + updated_at |
 
 ### stock_plan_sale_allocations (Silver — lot linkage)
@@ -404,10 +404,10 @@ Upcoming vests from vesting_schedule_json:
 
 ## Ingestion Pipeline
 
-1. **Upload** — user uploads E*Trade Benefit History XLSX (grants + events) and/or Trade Confirmation PDFs (sell events) via web UI
+1. **Upload** — user uploads E*Trade Benefit History XLSX (grants + events), Holdings XLSX, and/or G&L_Expanded XLSX (sell events) via web UI
 2. **Create ingestion** — generate ingestion_id, archive previous ACTIVE ingestion for this account
-3. **Write Bronze** — parse XLSX sheets and/or Trade Confirmation PDFs, write each row to bronze_raw (append-only)
-4. **Rebuild Silver** — DELETE Silver rows for this account, parse Bronze for ACTIVE ingestion: extract grants (parent rows), extract events (child rows linked to grants), extract sell events (from trade confirmations), compute cost_basis, apply event-time FX
+3. **Write Bronze** — parse XLSX sheets (Benefit History / Holdings / G&L_Expanded), write each row to bronze_raw (append-only)
+4. **Rebuild Silver** — DELETE Silver rows for this account, parse Bronze for ACTIVE ingestion: extract grants (parent rows), extract events (child rows linked to grants), extract sell events (from G&L_Expanded), compute cost_basis, apply event-time FX
 5. **Rebuild Gold** — DELETE Gold rows for this account, materialize portfolio/income/vesting views from Silver
 
 ### Rebuild Rule
@@ -431,7 +431,8 @@ stock-plan-manager/
 │   │   │   └── safe_decimal.ex           # SafeDecimal custom Ecto type (TEXT storage)
 │   │   ├── ingestion/
 │   │   │   ├── xlsx_parser.ex            # E*Trade Benefit History XLSX -> Bronze row structs
-│   │   │   ├── trade_confirmation_parser.ex  # E*Trade Trade Confirmation PDF -> sell event structs
+│   │   │   ├── holdings_parser.ex        # E*Trade Holdings (ByBenefitType) XLSX -> Bronze row structs
+│   │   │   ├── gl_parser.ex              # E*Trade G&L_Expanded XLSX -> sell event structs
 │   │   │   ├── bronze_writer.ex          # Bronze row structs -> DB
 │   │   │   ├── silver_builder.ex         # Bronze -> Silver (grants + events + sells)
 │   │   │   └── gold_builder.ex           # Silver -> Gold (portfolio + income)
@@ -490,7 +491,7 @@ stock-plan-manager/
 
 ### Phase 1 (Current)
 
-1. **Ingestion:** Benefit History XLSX upload + Trade Confirmation PDF upload (sell events), Bronze write, Silver + Gold rebuild
+1. **Ingestion:** Benefit History XLSX + Holdings XLSX + G&L_Expanded XLSX upload (sell events), Bronze write, Silver + Gold rebuild
 2. **Portfolio view:** Per-grant breakdown, group/filter by plan_type, vested/unvested, sellable/blocked, profit/loss. USD + INR toggle.
 3. **Income view:** Realized income (vested RSU, ESPP discount). Projected income (unvested * current price). Chart: grant value vs realized vs projected.
 4. **Vesting schedule:** Upcoming vests with projected value

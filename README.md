@@ -1,7 +1,7 @@
 # Stock Plan Manager
 
 A self-hosted, single-tenant app for managing equity compensation — RSU, ESPP, and
-Stock Options. Upload your E\*Trade Benefit History, Trade Confirmations, and G&L
+Stock Options. Upload your E\*Trade Benefit History, Holdings, and G&L
 exports; get a portfolio view, income breakdown, and capital-gains/tax analysis in
 **USD + INR**. Runs entirely on your own machine — nothing is uploaded anywhere else.
 
@@ -15,9 +15,9 @@ exports; get a portfolio view, income breakdown, and capital-gains/tax analysis 
 
 - **Single-tenant, self-hosted.** You run your own instance; your data stays on your
   own machine. No accounts, no servers operated by anyone else, no cloud upload.
-- **E\*Trade first.** Upload E\*Trade Benefit History (XLSX), Trade Confirmation
-  (PDF), and G&L Expanded exports to build a full picture of your RSU/ESPP/Stock
-  Option holdings.
+- **E\*Trade first.** Upload E\*Trade Benefit History (XLSX), Holdings
+  (ByBenefitType), and G&L Expanded exports to build a full picture of your
+  RSU/ESPP/Stock Option holdings.
 - **USD + INR.** Every view (portfolio, income, tax) can toggle between USD and INR,
   using historical and current USD/INR exchange rates.
 
