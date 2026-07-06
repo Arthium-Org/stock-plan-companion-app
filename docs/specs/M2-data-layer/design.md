@@ -270,7 +270,7 @@ ingestions ← sales ← sale_allocations
 {"tax_description": "AMT adjustment", "bargain_element": "5000.00"}
 
 // Sale metadata
-{"broker_fee": "4.95", "trade_confirmation_ref": "TC-2025-001234"}
+{"broker_fee": "4.95", "gl_ref": "GL-2025-001234"}
 ```
 
 ## Correctness Properties
@@ -319,7 +319,7 @@ exercises:
   ESOP: {tax_description, bargain_element}
 
 sales:
-  {broker_fee, trade_confirmation_ref}
+  {broker_fee, gl_ref}
 ```
 
 Rules: No dates (use typed columns). No prices you'll query often (those are columns). metadata_json is for supplementary/one-off fields only.

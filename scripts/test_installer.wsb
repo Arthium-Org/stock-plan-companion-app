@@ -16,7 +16,7 @@
       <ReadOnly>true</ReadOnly>
     </MappedFolder>
     <!--
-      Sample E*Trade files (Benefit History XLSX, Trade Confirmation PDFs, etc.)
+      Sample E*Trade files (Benefit History XLSX, Holdings XLSX, G&L_Expanded XLSX, etc.)
       mounted read-only so they can be uploaded into the app at localhost:4002
       without needing any network/download inside the VM. Read-only is safe: the
       app reads the file and copies its content into its own SQLite DB.

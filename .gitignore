@@ -65,7 +65,7 @@ npm-debug.log
 # snapshot is built by excluding these same paths at snapshot time, so this list must stay
 # in sync with the verified exclusion set in 01-CONTEXT.md.
 #
-# NOTE: .planning/, .claude/, and .cursor/ are committed here (public-primary model, D-04/D-01).
+# NOTE: .planning/, .claude/, and .cursor/ are IGNORED here (public-primary model, D-04/D-01).
 # A committed .gitignore is self-propagating — it travels with every clone, so any contributor
 # who clones the public repo and runs GSD gets their .planning/ auto-ignored with zero setup.
 # This is the mechanism that keeps D-01 (keep internal planning artifacts private) real. The
