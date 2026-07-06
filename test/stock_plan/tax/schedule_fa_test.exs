@@ -6,10 +6,10 @@ defmodule StockPlan.Tax.ScheduleFATest do
   alias StockPlan.Tax.ScheduleFA
   alias StockPlan.Ingestions
 
-  @bh_file "docs/Sample-Data/SampleUser - 1/sample-Etrade-BenefitHistory.xlsx"
-  @gl_2025 "docs/Sample-Data/SampleUser - 1/Sample-G&L_Expanded_2025.xlsx"
-  @gl_2024 "docs/Sample-Data/SampleUser - 1/Sample-G&L_Expanded_2024.xlsx"
-  @gl_2023 "docs/Sample-Data/SampleUser - 1/Sample-G&L_Expanded_2023.xlsx"
+  @bh_file "test/fixtures/sample-data/su1/sample-Etrade-BenefitHistory.xlsx"
+  @gl_2025 "test/fixtures/sample-data/su1/Sample-G&L_Expanded_2025.xlsx"
+  @gl_2024 "test/fixtures/sample-data/su1/Sample-G&L_Expanded_2024.xlsx"
+  @gl_2023 "test/fixtures/sample-data/su1/Sample-G&L_Expanded_2023.xlsx"
 
   @account_id "fa_test_user"
 
@@ -357,7 +357,12 @@ defmodule StockPlan.Tax.ScheduleFATest do
       }
 
       csv = ScheduleFA.row_to_csv(row)
-      assert csv =~ "Salesforce; Inc."
+      # csv_field/1 replaces commas with a double-space (ITR Schedule FA upload
+      # rejects commas, quotes, AND semicolons -- double space is the only
+      # separator the form accepts, per STATE.md Quick Task #2, 2026-07-04).
+      # "Salesforce, Inc." -> "Salesforce" + "  " (replacement) + " Inc." (the
+      # original space survives the comma-only replace) = "Salesforce   Inc."
+      assert csv =~ "Salesforce   Inc."
       assert csv =~ "(CRM)"
       assert csv =~ "Salesforce Tower"
     end

@@ -11,9 +11,9 @@ defmodule StockPlan.MultiSymbolTest do
   alias StockPlan.Schema.{Ingestion, Origin}
   import Ecto.Query
 
-  @bh_adbe "docs/Sample-Data/SampleUser - 5/SampleUser5-BenefitHistory-ADBE.xlsx"
-  @bh_crm "docs/Sample-Data/SampleUser - 5/SampleUser5-BenefitHistory-CRM.xlsx"
-  @holdings_crm "docs/Sample-Data/SampleUser - 5/SampleUser5-ByBenefitType_expanded-CRM.xlsx"
+  @bh_adbe "test/fixtures/sample-data/su5/SampleUser5-BenefitHistory-ADBE.xlsx"
+  @bh_crm "test/fixtures/sample-data/su5/SampleUser5-BenefitHistory-CRM.xlsx"
+  @holdings_crm "test/fixtures/sample-data/su5/SampleUser5-ByBenefitType_expanded-CRM.xlsx"
 
   @account_id "user5"
 

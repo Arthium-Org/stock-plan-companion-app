@@ -8,7 +8,7 @@ defmodule StockPlan.Ingestion.SilverBuilderTest do
   alias StockPlan.{Repo, TestFixtures}
   import Ecto.Query
 
-  @sample2 "docs/Sample-Data/SampleUser - 2/Sample2-BenefitHistory.xlsx"
+  @sample2 "test/fixtures/sample-data/su2/Sample2-BenefitHistory.xlsx"
 
   defp ingest_sample(file \\ @sample2) do
     ing = TestFixtures.create_ingestion()

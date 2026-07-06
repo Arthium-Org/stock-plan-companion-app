@@ -3,8 +3,9 @@ defmodule StockPlan.ManualTest do
   Golden-file verification against E*Trade XLSX exports.
 
   Compares what the app would show in Portfolio, Tax Centre (Capital Gains,
-  Schedule FA) with the reference files under `docs/Sample-Data/`. Intended as a
-  repeatable substitute for manual UI spot-checks after code changes.
+  Schedule FA) with the reference files under `test/fixtures/sample-data/`.
+  Intended as a repeatable substitute for manual UI spot-checks after code
+  changes.
 
   ## Usage
 

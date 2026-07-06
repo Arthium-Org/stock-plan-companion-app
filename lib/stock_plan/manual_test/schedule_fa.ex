@@ -11,6 +11,22 @@ defmodule StockPlan.ManualTest.ScheduleFA do
   import Ecto.Query
 
   @spec verify(String.t(), [String.t()], pos_integer()) :: [Result.t()]
+  def verify(account_id, gl_paths, calendar_year)
+
+  def verify(_account_id, [], calendar_year) do
+    # Personas with gl: [] (e.g. su1-unsold, su5-adbe-unsold — Holdings-only,
+    # 100% unrealized-path fixtures added in 05-02) have Benefit History sell
+    # events but deliberately no G&L file at all. ScheduleFA.build/2's P1
+    # hard gate correctly returns {:error, "G&L missing for sell dates..."}
+    # for this scenario — that is the intended, correct production behavior
+    # (M26 P1: never show FA figures without G&L-confirmed sell data), not a
+    # discrepancy to compare against a golden file. There is no G&L data for
+    # this check to verify against, so skip it rather than reporting the
+    # correct P1 block as a failure (mirrors Portfolio.verify/2's existing
+    # "Skipped — no Holdings file configured" pattern for the same reason).
+    skipped(calendar_year)
+  end
+
   def verify(account_id, gl_paths, calendar_year) do
     case FA.build(account_id, calendar_year) do
       {:error, {:missing_meta, syms}} ->
@@ -47,6 +63,16 @@ defmodule StockPlan.ManualTest.ScheduleFA do
     [
       Result.fail("#{prefix} — sale proceeds vs G&L", summary, failures),
       Result.fail("#{prefix} — closing vs holdings", summary, failures)
+    ]
+  end
+
+  defp skipped(calendar_year) do
+    prefix = "Schedule FA CY #{calendar_year}"
+    summary = "Skipped — no G&L files configured for this user (Holdings-only persona)"
+
+    [
+      Result.pass("#{prefix} — sale proceeds vs G&L", summary, []),
+      Result.pass("#{prefix} — closing vs holdings", summary, [])
     ]
   end
 

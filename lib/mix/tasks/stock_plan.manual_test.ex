@@ -15,7 +15,7 @@ defmodule Mix.Tasks.StockPlan.ManualTest do
   ## Options
 
     * `--account` — SQLite account id (default: `default`)
-    * `--user`    — sample user id under `docs/Sample-Data/` (default: `3`)
+    * `--user`    — sample user id under `test/fixtures/sample-data/` (default: `3`)
     * `--only`    — `portfolio`, `capital_gains`, `schedule_fa`, or omit for all
     * `--cy`      — Schedule FA calendar year (default: previous calendar year)
 
@@ -36,6 +36,19 @@ defmodule Mix.Tasks.StockPlan.ManualTest do
 
   @impl Mix.Task
   def run(argv) do
+    # StockPlan.Application boots StockPlan.FX.Sync.seed_from_bundle/0 in an
+    # unawaited Task.start/1 so a real server boot is never blocked on it.
+    # This one-shot CLI task calls System.halt/1 as soon as the checks
+    # finish, which can kill the BEAM before that async seed task completes
+    # -- non-deterministically leaving FxMonthlyRate rows missing and
+    # causing spurious "not reflected in any FA row" failures unrelated to
+    # any real Schedule FA / G&L reconciliation defect. seed_from_bundle/0
+    # reads only the local bundled JSON (no network) and upserts
+    # idempotently, so calling it synchronously here — before running the
+    # checks — makes this task's result deterministic regardless of
+    # scheduler timing.
+    StockPlan.FX.Sync.seed_from_bundle()
+
     {opts, _rest, _invalid} = OptionParser.parse(argv, strict: @switches)
 
     only =

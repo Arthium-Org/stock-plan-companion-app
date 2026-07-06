@@ -7,10 +7,10 @@ defmodule StockPlanWeb.TaxCentreLiveTest do
 
   alias StockPlan.Ingestions
 
-  @bh_file "docs/Sample-Data/SampleUser - 1/sample-Etrade-BenefitHistory.xlsx"
-  @gl_2023 "docs/Sample-Data/SampleUser - 1/Sample-G&L_Expanded_2023.xlsx"
-  @gl_2024 "docs/Sample-Data/SampleUser - 1/Sample-G&L_Expanded_2024.xlsx"
-  @gl_2025 "docs/Sample-Data/SampleUser - 1/Sample-G&L_Expanded_2025.xlsx"
+  @bh_file "test/fixtures/sample-data/su1/sample-Etrade-BenefitHistory.xlsx"
+  @gl_2023 "test/fixtures/sample-data/su1/Sample-G&L_Expanded_2023.xlsx"
+  @gl_2024 "test/fixtures/sample-data/su1/Sample-G&L_Expanded_2024.xlsx"
+  @gl_2025 "test/fixtures/sample-data/su1/Sample-G&L_Expanded_2025.xlsx"
 
   @account_id "default"
 
@@ -33,6 +33,9 @@ defmodule StockPlanWeb.TaxCentreLiveTest do
   test "selecting FY 2024-25 renders Capital Gains rows with Symbol column", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/tax")
 
+    # Tax Centre now defaults to the Schedule FA tab (STATE Quick Task #3,
+    # 2026-07-04) -- switch to Capital Gains before asserting its content.
+    render_click(view, "switch_tab", %{"tab" => "capital_gains"})
     html = render_change(view, "select_cg_fy", %{"fy" => "2024"})
 
     # Symbol column header (added in M22) — and an actual ticker reaches the row template

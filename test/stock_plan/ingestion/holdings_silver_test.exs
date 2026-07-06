@@ -8,8 +8,8 @@ defmodule StockPlan.Ingestion.HoldingsSilverTest do
   alias StockPlan.{Repo, TestFixtures}
   import Ecto.Query
 
-  @holdings_sample3 "docs/Sample-Data/SampleUser - 3/Sample3-ByBenefitType_expanded.xlsx"
-  @holdings_sample2 "docs/Sample-Data/SampleUser - 2/Sample2-ByBenefitType_expanded.xlsx"
+  @holdings_sample3 "test/fixtures/sample-data/su3/Sample3-ByBenefitType_expanded.xlsx"
+  @holdings_sample2 "test/fixtures/sample-data/su2/Sample2-ByBenefitType_expanded.xlsx"
 
   defp ingest_holdings(file, account_id) do
     ing =

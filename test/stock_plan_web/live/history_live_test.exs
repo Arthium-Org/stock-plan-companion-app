@@ -7,12 +7,12 @@ defmodule StockPlanWeb.HistoryLiveTest do
 
   alias StockPlan.Ingestions
 
-  @bh_user1 "docs/Sample-Data/SampleUser - 1/sample-Etrade-BenefitHistory.xlsx"
-  @gl_user1_2025 "docs/Sample-Data/SampleUser - 1/Sample-G&L_Expanded_2025.xlsx"
+  @bh_user1 "test/fixtures/sample-data/su1/sample-Etrade-BenefitHistory.xlsx"
+  @gl_user1_2025 "test/fixtures/sample-data/su1/Sample-G&L_Expanded_2025.xlsx"
 
-  @bh_adbe "docs/Sample-Data/SampleUser - 5/SampleUser5-BenefitHistory-ADBE.xlsx"
-  @bh_crm "docs/Sample-Data/SampleUser - 5/SampleUser5-BenefitHistory-CRM.xlsx"
-  @gl_su5 "docs/Sample-Data/SampleUser - 5/SampleUser5-G&L_Expanded.xlsx"
+  @bh_adbe "test/fixtures/sample-data/su5/SampleUser5-BenefitHistory-ADBE.xlsx"
+  @bh_crm "test/fixtures/sample-data/su5/SampleUser5-BenefitHistory-CRM.xlsx"
+  @gl_su5 "test/fixtures/sample-data/su5/SampleUser5-G&L_Expanded.xlsx"
 
   @account_id "default"
 
@@ -207,9 +207,16 @@ defmodule StockPlanWeb.HistoryLiveTest do
       {:ok, view, _html} = live(conn, ~p"/history")
       html = render_click(view, "select_plan", %{"plan" => "ESPP"})
 
+      # Commit c131831 ("feat(history): clearer Sell-on-Purchase labels +
+      # reorder", 2026-07-04) renamed these sub-labels: the Day-1 exit box's
+      # "avg per lot · day-1 exit" became "avg per lot · locked in at buy",
+      # and the Total/Current P&L box's "avg per lot · actual" was replaced
+      # entirely by "realized + unrealized" (no longer an "avg per lot ·"
+      # prefix, since Current P&L's tooltip now clarifies it includes
+      # unrealized mark-to-market, not just realized average).
       if html =~ "Sell-on-Purchase Analysis" do
-        assert html =~ "avg per lot · day-1 exit"
-        assert html =~ "avg per lot · actual"
+        assert html =~ "avg per lot · locked in at buy"
+        assert html =~ "realized + unrealized"
       end
     end
 

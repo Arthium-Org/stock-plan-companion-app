@@ -7,7 +7,7 @@ defmodule StockPlan.ManualTest.Fixtures do
   @users %{
     1 => %{
       label: "Sample User 1",
-      dir: "docs/Sample-Data/SampleUser - 1",
+      dir: "test/fixtures/sample-data/su1",
       holdings: nil,
       gl: [
         "Sample-G&L_Expanded_2023.xlsx",
@@ -18,7 +18,7 @@ defmodule StockPlan.ManualTest.Fixtures do
     },
     2 => %{
       label: "Sample User 2",
-      dir: "docs/Sample-Data/SampleUser - 2",
+      dir: "test/fixtures/sample-data/su2",
       holdings: "Sample2-ByBenefitType_expanded.xlsx",
       gl: [
         "G&L_Expanded_2025.xlsx",
@@ -28,24 +28,31 @@ defmodule StockPlan.ManualTest.Fixtures do
     },
     3 => %{
       label: "Sample User 3",
-      dir: "docs/Sample-Data/SampleUser - 3",
+      dir: "test/fixtures/sample-data/su3",
       holdings: "Sample3-ByBenefitType_expanded.xlsx",
       gl: ["Sample3-G&L_Expanded_2025.xlsx", "Sample3-G&L_Expanded_2026.xlsx"],
       capital_gains_fys: [2026, 2025]
     },
-    4 => %{
-      label: "Sample User 4",
-      dir: "docs/Sample-Data/SampleUser - 4",
-      holdings: "SampleUser4-ByBenefitType_expanded.xlsx",
-      gl: ["SampleUser4-G&L_Expanded.xlsx"],
-      capital_gains_fys: [2025]
-    },
     5 => %{
       label: "Sample User 5",
-      dir: "docs/Sample-Data/SampleUser - 5",
+      dir: "test/fixtures/sample-data/su5",
       holdings: "SampleUser5-ByBenefitType_expanded-CRM.xlsx",
       gl: ["SampleUser5-G&L_Expanded.xlsx"],
       capital_gains_fys: [2025]
+    },
+    6 => %{
+      label: "Sample User 1 (unsold holdings)",
+      dir: "test/fixtures/sample-data/su1-unsold",
+      holdings: "Holdings-ByBenefitType_expanded.xlsx",
+      gl: [],
+      capital_gains_fys: []
+    },
+    7 => %{
+      label: "Sample User 5 (ADBE multi-symbol, unsold holdings)",
+      dir: "test/fixtures/sample-data/su5-adbe-unsold",
+      holdings: "Holdings-ADBE-ByBenefitType_expanded.xlsx",
+      gl: [],
+      capital_gains_fys: []
     }
   }
 

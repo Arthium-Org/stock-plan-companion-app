@@ -5,8 +5,8 @@ defmodule StockPlan.Ingestion.HoldingsParserTest do
 
   alias StockPlan.Ingestion.{HoldingsParser, BronzeRow}
 
-  @sample3 "docs/Sample-Data/SampleUser - 3/Sample3-ByBenefitType_expanded.xlsx"
-  @sample2 "docs/Sample-Data/SampleUser - 2/Sample2-ByBenefitType_expanded.xlsx"
+  @sample3 "test/fixtures/sample-data/su3/Sample3-ByBenefitType_expanded.xlsx"
+  @sample2 "test/fixtures/sample-data/su2/Sample2-ByBenefitType_expanded.xlsx"
 
   describe "parse/1 — file validation" do
     test "returns error for missing file" do
