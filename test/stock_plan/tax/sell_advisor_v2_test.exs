@@ -7,8 +7,8 @@ defmodule StockPlan.Tax.SellAdvisorV2Test do
   alias StockPlan.Tax.SellAdvisorV2
   alias StockPlan.Ingestions
 
-  @bh_file "docs/Sample-Data/SampleUser - 3/Sample3-BenefitHistory.xlsx"
-  @holdings_file "docs/Sample-Data/SampleUser - 3/Sample3-ByBenefitType_expanded.xlsx"
+  @bh_file "test/fixtures/sample-data/su3/Sample3-BenefitHistory.xlsx"
+  @holdings_file "test/fixtures/sample-data/su3/Sample3-ByBenefitType_expanded.xlsx"
 
   @account_id "sell_advisor_v2_test"
 

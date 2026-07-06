@@ -7,8 +7,8 @@ defmodule StockPlanWeb.PortfolioLiveTest do
 
   alias StockPlan.Ingestions
 
-  @bh_file "docs/Sample-Data/SampleUser - 2/Sample2-BenefitHistory.xlsx"
-  @holdings_file "docs/Sample-Data/SampleUser - 2/Sample2-ByBenefitType_expanded.xlsx"
+  @bh_file "test/fixtures/sample-data/su2/Sample2-BenefitHistory.xlsx"
+  @holdings_file "test/fixtures/sample-data/su2/Sample2-ByBenefitType_expanded.xlsx"
 
   @account_id "default"
 

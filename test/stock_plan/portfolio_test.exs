@@ -8,9 +8,9 @@ defmodule StockPlan.PortfolioTest do
   alias StockPlan.Ingestion.{HoldingsParser, BronzeWriter, HoldingsSilverBuilder}
   alias StockPlan.TestFixtures
 
-  @bh_user1 "docs/Sample-Data/SampleUser - 1/sample-Etrade-BenefitHistory.xlsx"
-  @gl_user1 "docs/Sample-Data/SampleUser - 1/Sample-G&L_Expanded_2025.xlsx"
-  @holdings_user3 "docs/Sample-Data/SampleUser - 3/Sample3-ByBenefitType_expanded.xlsx"
+  @bh_user1 "test/fixtures/sample-data/su1/sample-Etrade-BenefitHistory.xlsx"
+  @gl_user1 "test/fixtures/sample-data/su1/Sample-G&L_Expanded_2025.xlsx"
+  @holdings_user3 "test/fixtures/sample-data/su3/Sample3-ByBenefitType_expanded.xlsx"
 
   defp setup_bh_user1 do
     {:ok, _} = Ingestions.ingest_benefit_history("user1_port", @bh_user1)

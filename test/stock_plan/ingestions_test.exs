@@ -8,9 +8,9 @@ defmodule StockPlan.IngestionsTest do
   alias StockPlan.Repo
   import Ecto.Query
 
-  @bh_file "docs/Sample-Data/SampleUser - 1/sample-Etrade-BenefitHistory.xlsx"
-  @gl_2025 "docs/Sample-Data/SampleUser - 1/Sample-G&L_Expanded_2025.xlsx"
-  @gl_2024 "docs/Sample-Data/SampleUser - 1/Sample-G&L_Expanded_2024.xlsx"
+  @bh_file "test/fixtures/sample-data/su1/sample-Etrade-BenefitHistory.xlsx"
+  @gl_2025 "test/fixtures/sample-data/su1/Sample-G&L_Expanded_2025.xlsx"
+  @gl_2024 "test/fixtures/sample-data/su1/Sample-G&L_Expanded_2024.xlsx"
 
   describe "ingest_benefit_history/2" do
     test "ingests valid BH file — full pipeline" do
@@ -35,7 +35,7 @@ defmodule StockPlan.IngestionsTest do
       {:ok, s1} = Ingestions.ingest_benefit_history("user1", @bh_file)
 
       # Use SampleUser-2 BH as "different" file (different hash)
-      bh2 = "docs/Sample-Data/SampleUser - 2/Sample2-BenefitHistory.xlsx"
+      bh2 = "test/fixtures/sample-data/su2/Sample2-BenefitHistory.xlsx"
       {:ok, s2} = Ingestions.ingest_benefit_history("user1", bh2)
 
       old = Repo.get(Ingestion, s1.ingestion_id)

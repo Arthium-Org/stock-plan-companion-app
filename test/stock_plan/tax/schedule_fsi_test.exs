@@ -6,10 +6,10 @@ defmodule StockPlan.Tax.ScheduleFSITest do
   alias StockPlan.Tax.ScheduleFSI
   alias StockPlan.Ingestions
 
-  @bh_file "docs/Sample-Data/SampleUser - 1/sample-Etrade-BenefitHistory.xlsx"
-  @gl_2025 "docs/Sample-Data/SampleUser - 1/Sample-G&L_Expanded_2025.xlsx"
-  @gl_2024 "docs/Sample-Data/SampleUser - 1/Sample-G&L_Expanded_2024.xlsx"
-  @gl_2023 "docs/Sample-Data/SampleUser - 1/Sample-G&L_Expanded_2023.xlsx"
+  @bh_file "test/fixtures/sample-data/su1/sample-Etrade-BenefitHistory.xlsx"
+  @gl_2025 "test/fixtures/sample-data/su1/Sample-G&L_Expanded_2025.xlsx"
+  @gl_2024 "test/fixtures/sample-data/su1/Sample-G&L_Expanded_2024.xlsx"
+  @gl_2023 "test/fixtures/sample-data/su1/Sample-G&L_Expanded_2023.xlsx"
 
   @account_id "fsi_test_user"
 
@@ -111,48 +111,11 @@ defmodule StockPlan.Tax.ScheduleFSITest do
     end
   end
 
-  describe "to_csv/1" do
-    test "generates valid CSV with header and 4 rows" do
-      fsi = ScheduleFSI.build(@account_id, 2024)
-      csv = ScheduleFSI.to_csv(fsi)
-
-      lines = String.split(csv, "\r\n")
-      assert length(lines) == 5
-
-      header = Enum.at(lines, 0)
-      assert header =~ "Sl No"
-      assert header =~ "Head of Income"
-      assert header =~ "DTAA Article"
-    end
-
-    test "CSV does not contain raw commas in text fields" do
-      fsi = ScheduleFSI.build(@account_id, 2024)
-      csv = ScheduleFSI.to_csv(fsi)
-
-      lines = String.split(csv, "\r\n")
-
-      for line <- Enum.drop(lines, 1), line != "" do
-        # Each data row should have exactly 8 commas (9 fields)
-        comma_count = line |> String.graphemes() |> Enum.count(&(&1 == ","))
-        assert comma_count == 8, "Expected 8 commas, got #{comma_count} in: #{line}"
-      end
-    end
-
-    test "CSV contains user_to_populate placeholders" do
-      fsi = ScheduleFSI.build(@account_id, 2024)
-      csv = ScheduleFSI.to_csv(fsi)
-
-      assert csv =~ "User to populate"
-    end
-
-    test "salary row has empty amounts" do
-      fsi = ScheduleFSI.build(@account_id, 2024)
-      csv = ScheduleFSI.to_csv(fsi)
-
-      lines = String.split(csv, "\r\n")
-      salary_line = Enum.at(lines, 1)
-
-      assert salary_line =~ "Salary"
-    end
-  end
+  # NOTE: ScheduleFSI.to_csv/1 was intentionally removed in commit f35bb93
+  # ("chore(schedule-fsi): remove unwired dead CSV export") -- the FSI CSV
+  # export was never reachable from the UI (no download button wired it up,
+  # unlike Schedule FA's download_fa_csv). ScheduleFSI.build/2 (tested above)
+  # is the only public API this module still exposes; there is no dead-code
+  # regression here, so the former "to_csv/1" describe block (4 tests) is
+  # removed rather than resurrecting a deliberately-deleted function.
 end

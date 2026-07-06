@@ -6,13 +6,13 @@ defmodule StockPlan.Ingestion.UploadChecksTest do
   alias StockPlan.Ingestion.UploadChecks
   alias StockPlan.Ingestions
 
-  @bh_file_1 "docs/Sample-Data/SampleUser - 1/sample-Etrade-BenefitHistory.xlsx"
-  @gl_2025_1 "docs/Sample-Data/SampleUser - 1/Sample-G&L_Expanded_2025.xlsx"
+  @bh_file_1 "test/fixtures/sample-data/su1/sample-Etrade-BenefitHistory.xlsx"
+  @gl_2025_1 "test/fixtures/sample-data/su1/Sample-G&L_Expanded_2025.xlsx"
 
-  @bh_file_3 "docs/Sample-Data/SampleUser - 3/Sample3-BenefitHistory.xlsx"
-  @holdings_file_3 "docs/Sample-Data/SampleUser - 3/Sample3-ByBenefitType_expanded.xlsx"
-  @gl_2025_3 "docs/Sample-Data/SampleUser - 3/Sample3-G&L_Expanded_2025.xlsx"
-  @gl_2026_3 "docs/Sample-Data/SampleUser - 3/Sample3-G&L_Expanded_2026.xlsx"
+  @bh_file_3 "test/fixtures/sample-data/su3/Sample3-BenefitHistory.xlsx"
+  @holdings_file_3 "test/fixtures/sample-data/su3/Sample3-ByBenefitType_expanded.xlsx"
+  @gl_2025_3 "test/fixtures/sample-data/su3/Sample3-G&L_Expanded_2025.xlsx"
+  @gl_2026_3 "test/fixtures/sample-data/su3/Sample3-G&L_Expanded_2026.xlsx"
 
   describe "empty account (no data)" do
     test "returns :error nudge for no BH, all features blocked" do
@@ -194,9 +194,9 @@ defmodule StockPlan.Ingestion.UploadChecksTest do
   end
 
   describe "check_symbol_consistency/1 (M22)" do
-    @bh_adbe "docs/Sample-Data/SampleUser - 5/SampleUser5-BenefitHistory-ADBE.xlsx"
-    @bh_crm "docs/Sample-Data/SampleUser - 5/SampleUser5-BenefitHistory-CRM.xlsx"
-    @holdings_crm "docs/Sample-Data/SampleUser - 5/SampleUser5-ByBenefitType_expanded-CRM.xlsx"
+    @bh_adbe "test/fixtures/sample-data/su5/SampleUser5-BenefitHistory-ADBE.xlsx"
+    @bh_crm "test/fixtures/sample-data/su5/SampleUser5-BenefitHistory-CRM.xlsx"
+    @holdings_crm "test/fixtures/sample-data/su5/SampleUser5-ByBenefitType_expanded-CRM.xlsx"
 
     @tag :user5
     test "CRM with Holdings produces no :bh_without_holdings nudge for CRM", %{} do

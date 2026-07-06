@@ -6,12 +6,12 @@ defmodule StockPlan.HistoryTest do
   alias StockPlan.History
   alias StockPlan.Ingestions
 
-  @bh_user1 "docs/Sample-Data/SampleUser - 1/sample-Etrade-BenefitHistory.xlsx"
-  @gl_user1 "docs/Sample-Data/SampleUser - 1/Sample-G&L_Expanded_2025.xlsx"
+  @bh_user1 "test/fixtures/sample-data/su1/sample-Etrade-BenefitHistory.xlsx"
+  @gl_user1 "test/fixtures/sample-data/su1/Sample-G&L_Expanded_2025.xlsx"
 
-  @bh_adbe "docs/Sample-Data/SampleUser - 5/SampleUser5-BenefitHistory-ADBE.xlsx"
-  @bh_crm "docs/Sample-Data/SampleUser - 5/SampleUser5-BenefitHistory-CRM.xlsx"
-  @gl_su5 "docs/Sample-Data/SampleUser - 5/SampleUser5-G&L_Expanded.xlsx"
+  @bh_adbe "test/fixtures/sample-data/su5/SampleUser5-BenefitHistory-ADBE.xlsx"
+  @bh_crm "test/fixtures/sample-data/su5/SampleUser5-BenefitHistory-CRM.xlsx"
+  @gl_su5 "test/fixtures/sample-data/su5/SampleUser5-G&L_Expanded.xlsx"
 
   describe "build/1 — empty account" do
     test "returns empty maps when no data uploaded" do
@@ -98,7 +98,7 @@ defmodule StockPlan.HistoryTest do
           assert %Decimal{} = g.recognized_usd
           # still_to_vest and vs_promise may be nil
           assert is_nil(g.still_to_vest_usd) or match?(%Decimal{}, g.still_to_vest_usd)
-          assert is_nil(g.vs_promise_pct) or match?(%Decimal{}, g.vs_promise_pct)
+          assert is_nil(g.vested_pct) or match?(%Decimal{}, g.vested_pct)
           # Removed fields must not be present
           refute Map.has_key?(g, :sold_qty)
           refute Map.has_key?(g, :realized_proceeds_usd)

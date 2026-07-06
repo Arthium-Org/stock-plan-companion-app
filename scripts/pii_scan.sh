@@ -65,9 +65,9 @@ REAL_TOKENS=(
 # --- Self-exclusion: this scan gate's own definition files legitimately contain the
 # token/path patterns above (as documentation/config); never treat them as findings. ---
 SELF_FILES=(
-  "scripts/publish_snapshot.sh"  # emits the placeholder token above literally
   "scripts/pii_scan.sh"
   ".gitleaks.toml"
+  "scripts/publish_snapshot.sh"  # emits the placeholder token above literally
 )
 
 # --- Config: reviewed doc-binary allowlist (Phase 4.2 checkpoint deviation, 2026-07-05) ---
@@ -81,6 +81,24 @@ DOC_BINARY_ALLOWLIST=(
   "docs/How To/Etrade_Files_Download_Help.pdf"
   "docs/How To/Etrade_Files_Download_Help_2.pdf"
 )
+
+# --- Config: synthetic fixture allowlist (Phase 5, 05-02-PLAN.md Task 3) ---
+# Check 1 blocks all tracked *.xlsx/*.pdf by extension because it cannot read
+# image/spreadsheet content. Anything under this prefix is a REVIEWED,
+# generated (never hand-authored) synthetic fixture: uniformly x0.65-scaled
+# from real E*Trade exports by the private-only
+# .planning/tools/generate_synthetic_fixtures.py transform (D-08), which
+# never embeds real financial values. This is a narrow PATH-PREFIX exemption
+# only -- it does NOT touch Check 2 below, which still scans every file
+# under this prefix (since it is NOT in EXCLUDED_PATH_PATTERNS) for the real
+# account token via unzip/sharedStrings.xml. That token scan is the actual
+# leak net for this fixture set and must never be weakened.
+SYNTHETIC_FIXTURE_ALLOWLIST_PREFIX="test/fixtures/sample-data/"
+
+is_synthetic_fixture() {
+  local f="$1"
+  [[ "$f" == "$SYNTHETIC_FIXTURE_ALLOWLIST_PREFIX"* ]]
+}
 
 if [ -t 1 ]; then
   RED=$'\033[0;31m'; GREEN=$'\033[0;32m'; YELLOW=$'\033[0;33m'; NC=$'\033[0m'
@@ -148,6 +166,7 @@ for f in "${ALL_TRACKED[@]}"; do
   case "$f" in
     *.xlsx|*.pdf)
       is_doc_binary_allowlisted "$f" && continue
+      is_synthetic_fixture "$f" && continue
       echo "${RED}  CODE-TREE PII${NC}: real broker export binary tracked: $f"
       CODE_TREE_PII_FOUND=1
       ;;

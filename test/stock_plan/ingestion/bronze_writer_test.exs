@@ -157,7 +157,7 @@ defmodule StockPlan.Ingestion.BronzeWriterTest do
   end
 
   describe "end-to-end pipeline (M3 → M4)" do
-    @sample1 "docs/Sample-Data/SampleUser - 1/sample-Etrade-BenefitHistory.xlsx"
+    @sample1 "test/fixtures/sample-data/su1/sample-Etrade-BenefitHistory.xlsx"
 
     @tag :integration
     test "parse XLSX and write to bronze" do

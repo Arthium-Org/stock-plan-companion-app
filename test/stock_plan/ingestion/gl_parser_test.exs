@@ -5,8 +5,8 @@ defmodule StockPlan.Ingestion.GlParserTest do
 
   alias StockPlan.Ingestion.{GlParser, BronzeRow}
 
-  @gl_2025 "docs/Sample-Data/SampleUser - 1/Sample-G&L_Expanded_2025.xlsx"
-  @gl_2024 "docs/Sample-Data/SampleUser - 1/Sample-G&L_Expanded_2024.xlsx"
+  @gl_2025 "test/fixtures/sample-data/su1/Sample-G&L_Expanded_2025.xlsx"
+  @gl_2024 "test/fixtures/sample-data/su1/Sample-G&L_Expanded_2024.xlsx"
 
   describe "parse/1" do
     test "parses G&L file successfully" do

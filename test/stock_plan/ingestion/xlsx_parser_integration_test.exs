@@ -6,8 +6,8 @@ defmodule StockPlan.Ingestion.XlsxParserIntegrationTest do
   alias StockPlan.Ingestion.XlsxParser
   alias StockPlan.Ingestion.BronzeRow
 
-  @sample1 "docs/Sample-Data/SampleUser - 1/sample-Etrade-BenefitHistory.xlsx"
-  @sample2 "docs/Sample-Data/SampleUser - 2/Sample2-BenefitHistory.xlsx"
+  @sample1 "test/fixtures/sample-data/su1/sample-Etrade-BenefitHistory.xlsx"
+  @sample2 "test/fixtures/sample-data/su2/Sample2-BenefitHistory.xlsx"
 
   @expected_sheets ["ESPP", "Restricted Stock", "Options"]
   @expected_record_types ["Grant", "Purchase", "Event", "Vest Schedule"]

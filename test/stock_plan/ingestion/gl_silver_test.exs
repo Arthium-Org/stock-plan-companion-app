@@ -8,14 +8,14 @@ defmodule StockPlan.Ingestion.GlSilverTest do
   alias StockPlan.{Repo, TestFixtures}
   import Ecto.Query
 
-  @benefit_history "docs/Sample-Data/SampleUser - 1/sample-Etrade-BenefitHistory.xlsx"
-  @gl_2025 "docs/Sample-Data/SampleUser - 1/Sample-G&L_Expanded_2025.xlsx"
-  @gl_2024 "docs/Sample-Data/SampleUser - 1/Sample-G&L_Expanded_2024.xlsx"
-  @gl_2023 "docs/Sample-Data/SampleUser - 1/Sample-G&L_Expanded_2023.xlsx"
+  @benefit_history "test/fixtures/sample-data/su1/sample-Etrade-BenefitHistory.xlsx"
+  @gl_2025 "test/fixtures/sample-data/su1/Sample-G&L_Expanded_2025.xlsx"
+  @gl_2024 "test/fixtures/sample-data/su1/Sample-G&L_Expanded_2024.xlsx"
+  @gl_2023 "test/fixtures/sample-data/su1/Sample-G&L_Expanded_2023.xlsx"
 
-  @bh_user2 "docs/Sample-Data/SampleUser - 2/Sample2-BenefitHistory.xlsx"
-  @gl_user2_2025 "docs/Sample-Data/SampleUser - 2/G&L_Expanded_2025.xlsx"
-  @gl_user2_2026 "docs/Sample-Data/SampleUser - 2/G&L_Expanded_2026.xlsx"
+  @bh_user2 "test/fixtures/sample-data/su2/Sample2-BenefitHistory.xlsx"
+  @gl_user2_2025 "test/fixtures/sample-data/su2/G&L_Expanded_2025.xlsx"
+  @gl_user2_2026 "test/fixtures/sample-data/su2/G&L_Expanded_2026.xlsx"
 
   defp ingest_benefit_history(account_id \\ "user1", file \\ @benefit_history) do
     ing = TestFixtures.create_ingestion(%{account_id: account_id, category: "BENEFIT_HISTORY"})
@@ -49,10 +49,12 @@ defmodule StockPlan.Ingestion.GlSilverTest do
       assert {:error, :no_benefit_history} = SilverBuilder.build("nonexistent")
     end
 
-    test "RSU vest_fmv is populated from stock prices without G&L" do
-      # Phase 4 stock-price enrichment fills vest_fmv from market close data
-      # even without a G&L file. The old assertion (vest_fmv == nil) is no
-      # longer correct; at least some vested tranches will have vest_fmv set.
+    test "RSU vest_day_close is populated from stock prices without G&L" do
+      # Phase 4 stock-price enrichment fills vest_day_close (not vest_fmv) from
+      # market close data even without a G&L file. vest_fmv stays nil on the
+      # BH-only path -- only vest_day_close is backfilled by stock-price
+      # enrichment (see SilverBuilder.enrich_stock_prices/1, which updates
+      # vest_day_close on VESTED tranches missing it).
       ing = ingest_benefit_history()
       {:ok, _} = SilverBuilder.build(ing.account_id)
 
@@ -65,8 +67,8 @@ defmodule StockPlan.Ingestion.GlSilverTest do
         )
 
       assert length(rsu_vested) > 0
-      # At least some vested tranches have vest_fmv filled by stock price enrichment
-      assert Enum.any?(rsu_vested, &(&1.vest_fmv != nil))
+      # At least some vested tranches have vest_day_close filled by stock price enrichment
+      assert Enum.any?(rsu_vested, &(&1.vest_day_close != nil))
     end
 
     test "RSU sales have nil price without G&L" do
@@ -258,10 +260,13 @@ defmodule StockPlan.Ingestion.GlSilverTest do
       # into one allocation by aggregate_gl_bronze/1.
       assert length(allocs) == 1
       # The G&L 2025 file has two rows for this lot (order 96988186, price 355.135):
-      # Qty=2 and Qty=4 — both same (grant, vest, order, price), so they aggregate to 6.
-      # The 2023 and 2024 files have no rows for this lot, so cross-file latest-wins
-      # does not reduce the count. The surviving ingestion's rows sum to 2+4=6.
-      assert Decimal.equal?(hd(allocs), Decimal.new("6"))
+      # real-data quantities of Qty=2 and Qty=4 aggregate to 6 (real Sample-Data).
+      # The synthetic fixture applies a x0.65 per-cell scale to quantities (05-02),
+      # which shifts this sum -- captured actual (not hand-derived) via a run
+      # against the synthetic fixture: 4. The 2023 and 2024 files have no rows for
+      # this lot, so cross-file latest-wins does not reduce the count; the
+      # surviving ingestion's rows are the only contributors to this sum.
+      assert Decimal.equal?(hd(allocs), Decimal.new("4"))
     end
 
     test "User 2 RU383740 / order 94231427 aggregates sub-lots into one allocation per (tranche, price)" do
@@ -297,9 +302,12 @@ defmodule StockPlan.Ingestion.GlSilverTest do
 
       assert length(allocs) > 0, "No allocations found for RU383740 / order 94231427"
 
-      # Verify the aggregated quantity for the vest 2025-04-15 lot equals 9.
-      # The 2025 G&L has 3 sub-lot rows for this (vest, order): Qty=4, Qty=4, Qty=1.
-      # aggregate_gl_bronze/1 sums them into one allocation: 4+4+1=9.
+      # Verify the aggregated quantity for the vest 2025-04-15 lot.
+      # The 2025 G&L has 3 sub-lot rows for this (vest, order): real-data
+      # quantities Qty=4, Qty=4, Qty=1 sum to 9 (real Sample-Data). The
+      # synthetic fixture applies a x0.65 per-cell scale to quantities (05-02),
+      # which shifts this sum -- captured actual (not hand-derived) via a run
+      # against the synthetic fixture: 7.
       tranche_apr15 =
         Repo.one!(
           from t in StockPlan.Schema.Tranche,
@@ -318,8 +326,8 @@ defmodule StockPlan.Ingestion.GlSilverTest do
             select: a.quantity
         )
 
-      assert Decimal.equal?(apr15_qty, Decimal.new("9")),
-             "Expected aggregated qty=9 for RU383740 vest 2025-04-15 / order 94231427, got #{apr15_qty}"
+      assert Decimal.equal?(apr15_qty, Decimal.new("7")),
+             "Expected aggregated qty=7 for RU383740 vest 2025-04-15 / order 94231427, got #{apr15_qty}"
     end
   end
 
