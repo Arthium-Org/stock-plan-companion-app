@@ -14,13 +14,59 @@ export PATH="$ASDF_DATA_DIR/shims:$PATH"
 # native build steps inside Mix release.
 export MACOSX_DEPLOYMENT_TARGET=11.0
 
-APP_NAME="StockPlan"
+APP_NAME="StockPlanCompanion"
 APP_BUNDLE="release/$APP_NAME.app"
-DMG_OUT="release/$APP_NAME.dmg"
+# Stable, version-LESS distribution filename so the GitHub "magic" download URL
+# (…/releases/latest/download/StockPlanCompanion-arm64.dmg) stays valid across
+# every release. The version lives in the git tag and mix.exs, not the filename.
+DMG_OUT="release/StockPlanCompanion-arm64.dmg"
 TEMP_DMG="release/.$APP_NAME.tmp.dmg"
 BG_PNG="release/.dmg_background.png"
 MOUNT_POINT="/Volumes/$APP_NAME"
 RELEASE_SRC="_build/prod/rel/stock_plan"
+
+# App version — single source of truth is mix.exs. Stamped into Info.plist so
+# Finder "Get Info" matches the release. (The in-app update check reads the OTP
+# application vsn, also from mix.exs — not Info.plist — so these stay in lockstep.)
+APP_VERSION="$(sed -nE 's/^[[:space:]]*version:[[:space:]]*"([^"]+)".*/\1/p' mix.exs | head -1)"
+if [ -z "$APP_VERSION" ]; then
+    echo "ERROR: could not read version: from mix.exs" >&2
+    exit 1
+fi
+
+# ---------------------------------------------------------------------------
+# Code-signing / notarization configuration (all optional — unset => local dev)
+#
+#   SIGN_IDENTITY   Developer ID Application identity for a DISTRIBUTABLE build,
+#                   e.g. "Developer ID Application: Opsflow LLC (SL8GR6RD2C)".
+#                   Unset or "-" => ad-hoc signing: fine for local runs, but NOT
+#                   notarizable and Gatekeeper-blocked on other Macs.
+#
+#   Notary credentials (only used when SIGN_IDENTITY is a real identity), pick one:
+#     NOTARY_KEYCHAIN_PROFILE   name of a profile stored via
+#                               `xcrun notarytool store-credentials` (preferred)
+#   — or —
+#     APPLE_ID + APPLE_TEAM_ID + APPLE_APP_PASSWORD   (app-specific password)
+#
+# With a real SIGN_IDENTITY AND notary creds, the script produces a fully
+# signed + notarized + stapled DMG ready for `gh release create`.
+# ---------------------------------------------------------------------------
+SIGN_IDENTITY="${SIGN_IDENTITY:--}"
+
+notary_creds_present() {
+    [ -n "${NOTARY_KEYCHAIN_PROFILE:-}" ] || \
+        { [ -n "${APPLE_ID:-}" ] && [ -n "${APPLE_TEAM_ID:-}" ] && [ -n "${APPLE_APP_PASSWORD:-}" ]; }
+}
+
+# notarize <path-to-.zip-or-.dmg> — submit and block until Apple returns a verdict.
+notarize() {
+    if [ -n "${NOTARY_KEYCHAIN_PROFILE:-}" ]; then
+        xcrun notarytool submit "$1" --keychain-profile "$NOTARY_KEYCHAIN_PROFILE" --wait
+    else
+        xcrun notarytool submit "$1" \
+            --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_PASSWORD" --wait
+    fi
+}
 
 echo "==> Cleaning previous artifacts"
 hdiutil detach "$MOUNT_POINT" -quiet 2>/dev/null || true
@@ -40,23 +86,23 @@ mkdir -p "$APP_BUNDLE/Contents/MacOS"
 mkdir -p "$APP_BUNDLE/Contents/Resources"
 cp -R "$RELEASE_SRC" "$APP_BUNDLE/Contents/Resources/release"
 
-cat > "$APP_BUNDLE/Contents/Info.plist" <<'PLIST'
+cat > "$APP_BUNDLE/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
     <key>CFBundleExecutable</key>
-    <string>StockPlan</string>
+    <string>$APP_NAME</string>
     <key>CFBundleIdentifier</key>
     <string>com.stockplan.app</string>
     <key>CFBundleName</key>
-    <string>StockPlan</string>
+    <string>$APP_NAME</string>
     <key>CFBundleDisplayName</key>
     <string>Stock Plan Manager</string>
     <key>CFBundleVersion</key>
-    <string>0.1.0</string>
+    <string>$APP_VERSION</string>
     <key>CFBundleShortVersionString</key>
-    <string>0.1.0</string>
+    <string>$APP_VERSION</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>LSMinimumSystemVersion</key>
@@ -100,8 +146,8 @@ rm -rf "$ICONSET_DIR" "$SQ_PNG"
 
 echo "==> Compiling native launcher"
 clang -O2 -Wall -mmacosx-version-min=11.0 \
-    -o "$APP_BUNDLE/Contents/MacOS/StockPlan" scripts/launcher.c
-chmod +x "$APP_BUNDLE/Contents/MacOS/StockPlan"
+    -o "$APP_BUNDLE/Contents/MacOS/$APP_NAME" scripts/launcher.c
+chmod +x "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
 
 echo "==> Bundling OpenSSL (libcrypto)"
 # Custom-built openssl with MACOSX_DEPLOYMENT_TARGET=11.0 so the dylib loads
@@ -126,14 +172,46 @@ install_name_tool -id "@loader_path/libcrypto.3.dylib" "$CRYPTO_LIB_DIR/libcrypt
 install_name_tool -change "$OPENSSL_HOMEBREW_LIB" "@loader_path/libcrypto.3.dylib" "$CRYPTO_LIB_DIR/crypto.so" 2>/dev/null || true
 install_name_tool -change "$OPENSSL_HOMEBREW_LIB" "@loader_path/libcrypto.3.dylib" "$CRYPTO_LIB_DIR/otp_test_engine.so" 2>/dev/null || true
 
-echo "==> Re-signing modified binaries"
-codesign --force --sign - "$CRYPTO_LIB_DIR/libcrypto.3.dylib"
-codesign --force --sign - "$CRYPTO_LIB_DIR/crypto.so"
-codesign --force --sign - "$CRYPTO_LIB_DIR/otp_test_engine.so"
+echo "==> Signing all Mach-O binaries (inside-out)"
+if [ "$SIGN_IDENTITY" = "-" ]; then
+    echo "    mode: ad-hoc — local dev only (NOT notarizable; set SIGN_IDENTITY for a release build)"
+    SIGN_ARGS=(--force --sign -)
+else
+    echo "    mode: Developer ID — $SIGN_IDENTITY"
+    SIGN_ARGS=(--force --options runtime --timestamp --sign "$SIGN_IDENTITY")
+fi
 
-echo "==> Ad-hoc signing the bundle"
-codesign --force --deep --sign - "$APP_BUNDLE"
+# Sign every nested Mach-O (ERTS executables, .so nifs, the bundled libcrypto)
+# BEFORE the bundle. This subsumes the crypto re-sign above and is what
+# notarization requires — Apple discourages --deep for distribution.
+while IFS= read -r -d '' f; do
+    if file "$f" | grep -q "Mach-O"; then
+        codesign "${SIGN_ARGS[@]}" "$f"
+    fi
+done < <(find "$APP_BUNDLE/Contents/Resources" -type f -print0)
+
+# Native launcher, then the bundle itself, signed last.
+codesign "${SIGN_ARGS[@]}" "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
+codesign "${SIGN_ARGS[@]}" "$APP_BUNDLE"
 codesign -dv "$APP_BUNDLE" 2>&1 | head -3
+
+# Notarize + staple the .app itself so it launches offline, even before the
+# DMG is stapled (only when a real identity is used).
+if [ "$SIGN_IDENTITY" != "-" ]; then
+    if notary_creds_present; then
+        echo "==> Notarizing the .app (submit + wait, then staple)"
+        APP_ZIP="release/.$APP_NAME.notarize.zip"
+        ditto -c -k --keepParent "$APP_BUNDLE" "$APP_ZIP"
+        notarize "$APP_ZIP"
+        xcrun stapler staple "$APP_BUNDLE"
+        rm -f "$APP_ZIP"
+    else
+        echo "WARNING: SIGN_IDENTITY is set but no notary credentials were provided."
+        echo "         The .app is Developer-ID signed but NOT notarized — it will be"
+        echo "         Gatekeeper-blocked on other Macs. Set NOTARY_KEYCHAIN_PROFILE (or"
+        echo "         APPLE_ID + APPLE_TEAM_ID + APPLE_APP_PASSWORD) for a shippable build."
+    fi
+fi
 
 echo "==> Generating DMG background image"
 swift scripts/make_dmg_background.swift "$BG_PNG"
@@ -184,9 +262,32 @@ hdiutil detach "$MOUNT_POINT" -quiet
 hdiutil convert "$TEMP_DMG" -format UDZO -imagekey zlib-level=9 -o "$DMG_OUT" >/dev/null
 rm "$TEMP_DMG" "$BG_PNG"
 
+# Sign + notarize + staple the DMG container itself so even the download wrapper
+# is tamper-evident and mounts without a quarantine prompt (only for real builds).
+if [ "$SIGN_IDENTITY" != "-" ]; then
+    echo "==> Signing the DMG"
+    codesign --force --sign "$SIGN_IDENTITY" "$DMG_OUT"
+    if notary_creds_present; then
+        echo "==> Notarizing the DMG (submit + wait, then staple)"
+        notarize "$DMG_OUT"
+        xcrun stapler staple "$DMG_OUT"
+    fi
+fi
+
 echo ""
-echo "Built:"
+echo "Built $APP_VERSION:"
 ls -lh "$DMG_OUT"
 echo ""
-echo "Share $DMG_OUT — recipient: double-click DMG, drag StockPlan to Applications, double-click StockPlan in /Applications."
-echo "First-launch override: System Settings → Privacy & Security → 'Open Anyway' once."
+if [ "$SIGN_IDENTITY" = "-" ]; then
+    echo "Signing: ad-hoc (local dev). Recipients must approve on first launch via"
+    echo "  System Settings → Privacy & Security → 'Open Anyway'."
+    echo "  For a public release, re-run with SIGN_IDENTITY + notary credentials set."
+else
+    echo "Signing: Developer ID — $SIGN_IDENTITY"
+    echo "Verify before publishing:"
+    echo "  spctl -a -vvv -t open --context context:primary-signature \"$DMG_OUT\""
+    echo "  xcrun stapler validate \"$DMG_OUT\""
+    echo "Publish (tag must equal mix.exs version $APP_VERSION):"
+    echo "  gh release create v$APP_VERSION \"$DMG_OUT\" \\"
+    echo "    --repo Arthium-Org/stock-plan-companion-app --title \"v$APP_VERSION\" --notes-file <notes.md>"
+fi
