@@ -75,6 +75,14 @@ rm -rf "$APP_BUNDLE" "$DMG_OUT" "$TEMP_DMG" "$BG_PNG"
 echo "==> Fetching prod dependencies"
 MIX_ENV=prod mix deps.get --only prod
 
+# Compile BEFORE assets.deploy. Phoenix 1.8 emits colocated LiveView JS hooks
+# (imported as "phoenix-colocated/stock_plan") into _build/prod/phoenix-colocated
+# during compilation. `mix assets.deploy` runs esbuild but does NOT compile first
+# (unlike `assets.build`), so on a cold _build/prod tree esbuild fails to resolve
+# that import. An explicit compile is idempotent on a warm tree.
+echo "==> Compiling app (prod)"
+MIX_ENV=prod mix compile
+
 echo "==> Building assets"
 MIX_ENV=prod mix assets.deploy
 
