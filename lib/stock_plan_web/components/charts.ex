@@ -117,9 +117,22 @@ defmodule StockPlanWeb.Components.Charts do
           <% end %>
         <% end %>
         <%= for cat <- @chart.x_labels do %>
-          <text x={cat.x} y={174} text-anchor="middle" font-size="10" fill="#9CA3AF">
-            {cat.label}
-          </text>
+          <%= if @chart.rotate_x do %>
+            <text
+              x={cat.x}
+              y={168}
+              text-anchor="end"
+              font-size="10"
+              fill="#9CA3AF"
+              transform={"rotate(-30 #{cat.x} 168)"}
+            >
+              {cat.label}
+            </text>
+          <% else %>
+            <text x={cat.x} y={174} text-anchor="middle" font-size="10" fill="#9CA3AF">
+              {cat.label}
+            </text>
+          <% end %>
         <% end %>
       </svg>
     <% end %>
@@ -650,11 +663,23 @@ defmodule StockPlanWeb.Components.Charts do
         end)
         |> Enum.filter(& &1.show)
 
+      # Rotate the x-axis labels when the widest one (~6px/char at font-size 10)
+      # would collide with its neighbor at the current point spacing. Long FY
+      # labels ("FY 2015-16") across many years overlap horizontally otherwise;
+      # short labels ("2024") stay flat.
+      max_label_px =
+        categories
+        |> Enum.map(&(String.length(to_string(&1)) * 6))
+        |> Enum.max(fn -> 0 end)
+
+      rotate_x = max_label_px > slot
+
       %{
         empty?: false,
         series: series,
         y_ticks: y_ticks,
         x_labels: x_labels,
+        rotate_x: rotate_x,
         svg_width: layout.svg_width
       }
     end
@@ -708,13 +733,13 @@ defmodule StockPlanWeb.Components.Charts do
     Enum.map_join(pts, " ", fn p -> "#{Float.round(p.x, 1)},#{Float.round(p.y, 1)}" end)
   end
 
-  defp format_axis(val, "INR") when val >= 10_000_000, do: "₹#{trunc(val / 10_000_000)}Cr"
+  defp format_axis(val, "INR") when val >= 10_000_000, do: "₹#{Float.round(val / 10_000_000, 2)}Cr"
   defp format_axis(val, "INR") when val >= 100_000, do: "₹#{Float.round(val / 100_000, 1)}L"
-  defp format_axis(val, "INR") when val >= 1_000, do: "₹#{trunc(val / 1_000)}K"
-  defp format_axis(val, "INR"), do: "₹#{trunc(val)}"
-  defp format_axis(val, _) when val >= 1_000_000, do: "$#{Float.round(val / 1_000_000, 1)}M"
-  defp format_axis(val, _) when val >= 1_000, do: "$#{trunc(val / 1_000)}K"
-  defp format_axis(val, _), do: "$#{trunc(val)}"
+  defp format_axis(val, "INR") when val >= 1_000, do: "₹#{round(val / 1_000)}K"
+  defp format_axis(val, "INR"), do: "₹#{round(val)}"
+  defp format_axis(val, _) when val >= 1_000_000, do: "$#{Float.round(val / 1_000_000, 2)}M"
+  defp format_axis(val, _) when val >= 1_000, do: "$#{round(val / 1_000)}K"
+  defp format_axis(val, _), do: "$#{round(val)}"
 
   defp fmt_qty_hover(nil), do: "—"
   defp fmt_qty_hover(%Decimal{} = d), do: Decimal.round(d, 2) |> Decimal.to_string()
