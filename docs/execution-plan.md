@@ -307,7 +307,6 @@ Steps 1-18 done. **M19 (Desktop Executable) = Phase 1 closer.** Mobile path (M16
 
 ## Phase 2 Modules (Future)
 
-- Trade Confirmation PDF Parser (sell event details)
 - Tax Engine (income tax, capital gains STCG/LTCG, ESPP qualification rules)
 - Sell Guidance (tax-optimal lot selection)
 - ITR Document Generation (Schedule FA, FSI, capital gains)

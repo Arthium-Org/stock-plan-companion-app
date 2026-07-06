@@ -443,5 +443,4 @@ end
 
 - Drag files between slots (too complex for now)
 - Auto-detect and auto-assign to correct slot (Phase 2 — single drop zone)
-- PDF upload (Trade Confirmations) — separate feature
 - Timeline detail mode drill-down into individual sell transactions (future)

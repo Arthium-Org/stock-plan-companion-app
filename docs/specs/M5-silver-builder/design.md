@@ -304,7 +304,7 @@ Silver:
 - **RSU vest_fmv**: Not available in Benefit History. Leave nil. Future sources: G&L_Expanded (has `Vest Date FMV`), or stock price API (Yahoo adjusted close).
 - **FX rates**: All fx_rate fields left nil in Phase 1. M7 (FX Service) will populate them later.
 - **No exercises in Phase 1 data**: SampleUser-2 has no Options sheet. Exercise processing is implemented but untested with real data.
-- **Sale price always nil from Benefit History**: Sales created with `sale_price: nil`. Trade Confirmation or G&L_Expanded fills this in.
+- **Sale price always nil from Benefit History**: Sales created with `sale_price: nil`. G&L_Expanded fills this in.
 - **RSU sale allocations**: NOT created from Benefit History. Lot linkage is indeterminate (user picks which lot to sell). Allocations come from G&L_Expanded which has per-lot sale records with Grant Number + Vest Date.
 
 ## Future Data Sources (not M5 scope, separate milestones)
@@ -314,4 +314,3 @@ Silver:
 | G&L_Expanded XLSX | Sale allocations (lot linkage), vest_fmv, sale price, cost basis, capital gains | High — unlocks tax reporting |
 | Stock Price API (Yahoo) | vest_fmv for unsold lots, current portfolio value | Medium |
 | FX Rate API (RBI/manual) | USD/INR rates for all dates | Medium |
-| Trade Confirmations PDF | Sale price, broker fees, net proceeds | Low (G&L has most of this) |
