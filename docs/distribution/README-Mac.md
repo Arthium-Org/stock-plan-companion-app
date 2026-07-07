@@ -96,6 +96,12 @@ his machine** and are never shared with the maintainer — only the resulting
 signed, notarized, stapled DMG is handed back (or attached directly to the
 Release, since the friend has repo admin access).
 
+**Running the release via Claude Code?** Hand Claude
+`docs/distribution/CLAUDE-mac-release.md` — a step-by-step runbook that verifies
+prereqs, interactively collects the signing inputs, runs the build below,
+verifies Gatekeeper, and publishes (with an explicit confirmation). The rest of
+this section is the manual equivalent.
+
 `scripts/build_release.sh` does the whole thing in one command: it Mix-releases
 the app, signs **every** nested Mach-O (ERTS binaries, NIFs, bundled libcrypto)
 inside-out with the hardened runtime, notarizes + staples the `.app`, builds the
