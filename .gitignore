@@ -48,6 +48,13 @@ npm-debug.log
 # Mac release build artifacts (built via scripts/build_release.sh)
 /release/
 
+# Local release artifact staging (DMGs / signed .app zips / notes) — publish
+# these to the GitHub Release as assets, never commit the binaries.
+/releases/
+
+# Build logs (e.g. saved output of the Windows/Mac build scripts)
+/logs/
+
 # Windows installer build artifacts (built via scripts/build_release_windows.ps1)
 /scripts/StockPlan.exe
 /scripts/vcredist_x64.exe
