@@ -1,14 +1,22 @@
 name: macOS Release
 
-# Trigger on version tags (v1.2.3) or manual dispatch for testing.
+# Triggers:
+#   push to main or release branch → build + sign + notarize + publish
+#     (publishes to the release matching the version in mix.exs, clobbering
+#      any existing DMG asset so the Windows .exe is never disturbed)
+#   push of a v* tag → same, but also creates the release if it doesn't exist
+#   workflow_dispatch → manual run for testing
 on:
   push:
+    branches:
+      - main
+      - release
     tags:
       - "v*"
   workflow_dispatch:
 
 permissions:
-  contents: write   # needed to create releases and upload assets
+  contents: write   # create releases + upload assets
 
 env:
   OTP_VERSION: "27.3.4"
@@ -31,7 +39,7 @@ jobs:
 
       # ── Mix dependency cache ─────────────────────────────────────────────────
       # build_release.sh runs `mix deps.get --only prod` itself, but a warm
-      # deps/ and _build/prod tree avoids re-downloading and re-compiling.
+      # deps/ and _build/prod tree cuts several minutes off each run.
       - name: Cache Mix deps
         uses: actions/cache@v4
         with:
@@ -41,39 +49,12 @@ jobs:
           key: ${{ runner.os }}-${{ runner.arch }}-mix-prod-${{ hashFiles('mix.lock') }}
           restore-keys: ${{ runner.os }}-${{ runner.arch }}-mix-prod-
 
-      # ── openssl-compat: libcrypto with minos=11.0 ──────────────────────────
-      # GitHub Actions macos-latest (currently macOS 15 / Sequoia) ships
-      # Homebrew openssl stamped at the host's macOS version. That dylib carries
-      # LC_VERSION_MIN_MACOSX=15 and refuses to load on macOS 11-14. We build
-      # our own shared libcrypto with MACOSX_DEPLOYMENT_TARGET=11.0, cache it,
-      # and place it where build_release.sh expects it (~/.openssl-compat/lib/).
-      - name: Restore openssl-compat cache
-        id: cache-openssl
-        uses: actions/cache@v4
-        with:
-          path: ~/openssl-compat
-          key: openssl-compat-arm64-3.5.0
-
-      - name: Build openssl-compat (minos=11.0)
-        if: steps.cache-openssl.outputs.cache-hit != 'true'
-        run: |
-          set -euo pipefail
-          OPENSSL_VERSION="3.5.0"
-          curl -fsSL "https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz" \
-            | tar xz
-          cd "openssl-${OPENSSL_VERSION}"
-          MACOSX_DEPLOYMENT_TARGET=11.0 \
-            ./Configure darwin64-arm64-cc \
-              --prefix="$HOME/openssl-compat" \
-              shared no-tests
-          make -j"$(sysctl -n hw.logicalcpu)"
-          make install_sw
-          # Normalize the dylib ID so install_name_tool in the build script works.
-          install_name_tool -id \
-            "@loader_path/libcrypto.3.dylib" \
-            "$HOME/openssl-compat/lib/libcrypto.3.dylib"
-          cd ..
-          rm -rf "openssl-${OPENSSL_VERSION}"
+      # ── OpenSSL (Homebrew pre-installed on macos-latest) ───────────────────
+      # build_release.sh uses vtool to patch Homebrew's libcrypto minos to 11.0
+      # in-place, so no source build or cache is needed here. Just make sure
+      # openssl@3 is present (it is on all GitHub Actions macOS runners).
+      - name: Ensure openssl@3 is installed
+        run: brew list openssl@3 >/dev/null 2>&1 || brew install openssl@3
 
       # ── Import Developer ID signing certificate ─────────────────────────────
       # Decodes the base64-encoded .p12 export, imports it into a temporary
@@ -98,15 +79,14 @@ jobs:
           rm /tmp/certificate.p12
 
       # ── Ensure Finder is running for DMG window layout ─────────────────────
-      # build_release.sh uses osascript/Finder to configure the DMG icon layout.
-      # On the CI runner's user session Finder may not be active yet.
+      # build_release.sh uses osascript/Finder to set the DMG icon layout.
       - name: Start Finder
         run: open -a Finder || true
 
       # ── Build, sign, notarize, staple ───────────────────────────────────────
       # build_release.sh handles the full pipeline:
-      #   Mix release → assemble .app → sign all Mach-O → notarize+staple .app
-      #   → create DMG → sign+notarize+staple DMG
+      #   Mix release → assemble .app → sign all Mach-O (beam.smp with allow-jit)
+      #   → notarize+staple .app → create DMG → sign+notarize+staple DMG
       # Credentials are passed as env vars and never written to disk or committed.
       - name: Build signed + notarized DMG
         env:
@@ -132,21 +112,27 @@ jobs:
           path: release/StockPlanCompanion-arm64.dmg
           retention-days: 7
 
-      # ── Publish to GitHub Release (tag pushes only) ─────────────────────────
-      # For an existing tag (reuse): uploads/overwrites the DMG asset only.
-      #   The Windows StockPlan-Setup.exe on the same tag is untouched (--clobber
-      #   targets the specific filename).
-      # For a new tag: creates the release with auto-generated notes.
+      # ── Publish to GitHub Release ───────────────────────────────────────────
+      # For branch pushes (main / release): derive tag from mix.exs version and
+      # clobber the DMG on that release. The Windows exe is never touched.
+      # For tag pushes (v*): create the release if it doesn't exist, then upload.
       - name: Publish to GitHub Release
-        if: startsWith(github.ref, 'refs/tags/')
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG="${{ github.ref_name }}"
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG="${{ github.ref_name }}"
+          else
+            VERSION=$(sed -nE 's/^[[:space:]]*version:[[:space:]]*"([^"]+)".*/\1/p' mix.exs | head -1)
+            TAG="v${VERSION}"
+          fi
+
+          echo "Publishing DMG to release $TAG"
+
           if gh release view "$TAG" \
                --repo Arthium-Org/stock-plan-companion-app \
                >/dev/null 2>&1; then
-            echo "Release $TAG exists — uploading/overwriting DMG asset"
+            echo "Release exists — uploading/overwriting DMG asset"
             gh release upload "$TAG" release/StockPlanCompanion-arm64.dmg \
               --repo Arthium-Org/stock-plan-companion-app \
               --clobber
@@ -160,11 +146,15 @@ jobs:
 
       # ── Verify published release ────────────────────────────────────────────
       - name: Verify published release assets
-        if: startsWith(github.ref, 'refs/tags/')
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG="${{ github.ref_name }}"
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG="${{ github.ref_name }}"
+          else
+            VERSION=$(sed -nE 's/^[[:space:]]*version:[[:space:]]*"([^"]+)".*/\1/p' mix.exs | head -1)
+            TAG="v${VERSION}"
+          fi
           LOCAL_SHA=$(shasum -a 256 release/StockPlanCompanion-arm64.dmg | awk '{print $1}')
           echo "Local DMG SHA256: $LOCAL_SHA"
           gh release view "$TAG" \
