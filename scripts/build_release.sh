@@ -201,7 +201,7 @@ done < <(find "$APP_BUNDLE/Contents/Resources" -type f -print0)
 # Native launcher, then the bundle itself, signed last.
 codesign "${SIGN_ARGS[@]}" "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
 codesign "${SIGN_ARGS[@]}" "$APP_BUNDLE"
-codesign -dv "$APP_BUNDLE" 2>&1 | head -3
+codesign -dv "$APP_BUNDLE" 2>&1 | head -3 || true
 
 # Notarize + staple the .app itself so it launches offline, even before the
 # DMG is stapled (only when a real identity is used).

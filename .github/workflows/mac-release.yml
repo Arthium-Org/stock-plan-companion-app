@@ -1,0 +1,178 @@
+name: macOS Release
+
+# Trigger on version tags (v1.2.3) or manual dispatch for testing.
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write   # needed to create releases and upload assets
+
+env:
+  OTP_VERSION: "27.3.4"
+  ELIXIR_VERSION: "1.18.4"
+
+jobs:
+  build-sign-notarize:
+    runs-on: macos-latest   # Apple Silicon (arm64)
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── Language toolchain ──────────────────────────────────────────────────
+      # Matches .tool-versions (erlang 27.3.4.12 / elixir 1.18.4-otp-27).
+      - name: Set up Erlang/Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          otp-version: ${{ env.OTP_VERSION }}
+          elixir-version: ${{ env.ELIXIR_VERSION }}
+
+      # ── Mix dependency cache ─────────────────────────────────────────────────
+      # build_release.sh runs `mix deps.get --only prod` itself, but a warm
+      # deps/ and _build/prod tree avoids re-downloading and re-compiling.
+      - name: Cache Mix deps
+        uses: actions/cache@v4
+        with:
+          path: |
+            deps
+            _build/prod
+          key: ${{ runner.os }}-${{ runner.arch }}-mix-prod-${{ hashFiles('mix.lock') }}
+          restore-keys: ${{ runner.os }}-${{ runner.arch }}-mix-prod-
+
+      # ── openssl-compat: libcrypto with minos=11.0 ──────────────────────────
+      # GitHub Actions macos-latest (currently macOS 15 / Sequoia) ships
+      # Homebrew openssl stamped at the host's macOS version. That dylib carries
+      # LC_VERSION_MIN_MACOSX=15 and refuses to load on macOS 11-14. We build
+      # our own shared libcrypto with MACOSX_DEPLOYMENT_TARGET=11.0, cache it,
+      # and place it where build_release.sh expects it (~/.openssl-compat/lib/).
+      - name: Restore openssl-compat cache
+        id: cache-openssl
+        uses: actions/cache@v4
+        with:
+          path: ~/openssl-compat
+          key: openssl-compat-arm64-3.5.0
+
+      - name: Build openssl-compat (minos=11.0)
+        if: steps.cache-openssl.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          OPENSSL_VERSION="3.5.0"
+          curl -fsSL "https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz" \
+            | tar xz
+          cd "openssl-${OPENSSL_VERSION}"
+          MACOSX_DEPLOYMENT_TARGET=11.0 \
+            ./Configure darwin64-arm64-cc \
+              --prefix="$HOME/openssl-compat" \
+              shared no-tests
+          make -j"$(sysctl -n hw.logicalcpu)"
+          make install_sw
+          # Normalize the dylib ID so install_name_tool in the build script works.
+          install_name_tool -id \
+            "@loader_path/libcrypto.3.dylib" \
+            "$HOME/openssl-compat/lib/libcrypto.3.dylib"
+          cd ..
+          rm -rf "openssl-${OPENSSL_VERSION}"
+
+      # ── Import Developer ID signing certificate ─────────────────────────────
+      # Decodes the base64-encoded .p12 export, imports it into a temporary
+      # keychain scoped to this runner, then grants codesign access to it.
+      - name: Import signing certificate
+        env:
+          CERT_B64: ${{ secrets.MACOS_CERTIFICATE_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          echo "$CERT_B64" | base64 --decode > /tmp/certificate.p12
+          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security import /tmp/certificate.p12 \
+            -k build.keychain \
+            -P "$CERT_PASSWORD" \
+            -T /usr/bin/codesign
+          security set-key-partition-list \
+            -S apple-tool:,apple:,codesign: \
+            -s -k "$KEYCHAIN_PASSWORD" build.keychain
+          rm /tmp/certificate.p12
+
+      # ── Ensure Finder is running for DMG window layout ─────────────────────
+      # build_release.sh uses osascript/Finder to configure the DMG icon layout.
+      # On the CI runner's user session Finder may not be active yet.
+      - name: Start Finder
+        run: open -a Finder || true
+
+      # ── Build, sign, notarize, staple ───────────────────────────────────────
+      # build_release.sh handles the full pipeline:
+      #   Mix release → assemble .app → sign all Mach-O → notarize+staple .app
+      #   → create DMG → sign+notarize+staple DMG
+      # Credentials are passed as env vars and never written to disk or committed.
+      - name: Build signed + notarized DMG
+        env:
+          SIGN_IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: ./scripts/build_release.sh
+
+      # ── Gatekeeper + stapler verification ──────────────────────────────────
+      - name: Verify Gatekeeper acceptance
+        run: |
+          spctl -a -vvv -t open \
+            --context context:primary-signature \
+            release/StockPlanCompanion-arm64.dmg
+          xcrun stapler validate release/StockPlanCompanion-arm64.dmg
+
+      # ── Upload DMG as workflow artifact (always) ────────────────────────────
+      - name: Upload DMG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: StockPlanCompanion-macOS-arm64
+          path: release/StockPlanCompanion-arm64.dmg
+          retention-days: 7
+
+      # ── Publish to GitHub Release (tag pushes only) ─────────────────────────
+      # For an existing tag (reuse): uploads/overwrites the DMG asset only.
+      #   The Windows StockPlan-Setup.exe on the same tag is untouched (--clobber
+      #   targets the specific filename).
+      # For a new tag: creates the release with auto-generated notes.
+      - name: Publish to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ github.ref_name }}"
+          if gh release view "$TAG" \
+               --repo Arthium-Org/stock-plan-companion-app \
+               >/dev/null 2>&1; then
+            echo "Release $TAG exists — uploading/overwriting DMG asset"
+            gh release upload "$TAG" release/StockPlanCompanion-arm64.dmg \
+              --repo Arthium-Org/stock-plan-companion-app \
+              --clobber
+          else
+            echo "Creating new release $TAG"
+            gh release create "$TAG" release/StockPlanCompanion-arm64.dmg \
+              --repo Arthium-Org/stock-plan-companion-app \
+              --title "$TAG" \
+              --generate-notes
+          fi
+
+      # ── Verify published release ────────────────────────────────────────────
+      - name: Verify published release assets
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ github.ref_name }}"
+          LOCAL_SHA=$(shasum -a 256 release/StockPlanCompanion-arm64.dmg | awk '{print $1}')
+          echo "Local DMG SHA256: $LOCAL_SHA"
+          gh release view "$TAG" \
+            --repo Arthium-Org/stock-plan-companion-app \
+            --json tagName,assets \
+            --jq '{tag: .tagName, assets: [.assets[] | {name, size}]}'
+
+      # ── Cleanup keychain ────────────────────────────────────────────────────
+      - name: Delete build keychain
+        if: always()
+        run: security delete-keychain build.keychain 2>/dev/null || true
