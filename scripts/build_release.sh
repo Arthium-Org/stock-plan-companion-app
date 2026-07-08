@@ -158,19 +158,28 @@ clang -O2 -Wall -mmacosx-version-min=11.0 \
 chmod +x "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
 
 echo "==> Bundling OpenSSL (libcrypto)"
-# Custom-built openssl with MACOSX_DEPLOYMENT_TARGET=11.0 so the dylib loads
-# on macOS 11+ (Homebrew's openssl is stamped with whatever the build host's
-# macOS is, which on Tahoe means minos=26 and refuses to load on Sequoia).
+# We need libcrypto with minos=11.0 so it loads on macOS 11+. The Homebrew dylib
+# carries the build host's minos (e.g. 26.0 on Tahoe) and refuses to load on older
+# systems. We use vtool to patch a copy of the Homebrew dylib — this keeps the
+# symbol set in sync with the OTP crypto.so that was compiled against it, avoiding
+# "Symbol not found" crashes that occur when building from an older OpenSSL source.
 OPENSSL_COMPAT_LIB="$HOME/openssl-compat/lib/libcrypto.3.dylib"
 OPENSSL_HOMEBREW_LIB="/opt/homebrew/opt/openssl@3/lib/libcrypto.3.dylib"
 
-if [ -f "$OPENSSL_COMPAT_LIB" ]; then
-    OPENSSL_SRC="$OPENSSL_COMPAT_LIB"
-else
-    echo "ERROR: backwards-compatible openssl not found at $OPENSSL_COMPAT_LIB." >&2
-    echo "Build it from source with MACOSX_DEPLOYMENT_TARGET=11.0 first." >&2
+if [ ! -f "$OPENSSL_HOMEBREW_LIB" ]; then
+    echo "ERROR: Homebrew openssl@3 not found at $OPENSSL_HOMEBREW_LIB. Run: brew install openssl@3" >&2
     exit 1
 fi
+
+# Patch a fresh copy of Homebrew's libcrypto to lower the minimum OS version.
+# vtool only rewrites the load command metadata — no code change.
+mkdir -p "$HOME/openssl-compat/lib"
+cp "$OPENSSL_HOMEBREW_LIB" "$OPENSSL_COMPAT_LIB"
+SDK_VERSION=$(vtool -show-build "$OPENSSL_HOMEBREW_LIB" 2>/dev/null | awk '/sdk /{print $2}' | head -1)
+SDK_VERSION="${SDK_VERSION:-26.0}"
+vtool -set-build-version macos 11.0 "$SDK_VERSION" -replace -output "$OPENSSL_COMPAT_LIB" "$OPENSSL_COMPAT_LIB"
+echo "    openssl-compat: minos patched to 11.0 (sdk $SDK_VERSION, source: $(basename "$OPENSSL_HOMEBREW_LIB"))"
+OPENSSL_SRC="$OPENSSL_COMPAT_LIB"
 CRYPTO_LIB_DIR=$(ls -d "$APP_BUNDLE/Contents/Resources/release/lib/crypto-"*/priv/lib | head -1)
 cp "$OPENSSL_SRC" "$CRYPTO_LIB_DIR/libcrypto.3.dylib"
 chmod 755 "$CRYPTO_LIB_DIR/libcrypto.3.dylib"
@@ -184,23 +193,48 @@ echo "==> Signing all Mach-O binaries (inside-out)"
 if [ "$SIGN_IDENTITY" = "-" ]; then
     echo "    mode: ad-hoc — local dev only (NOT notarizable; set SIGN_IDENTITY for a release build)"
     SIGN_ARGS=(--force --sign -)
+    BUNDLE_SIGN_ARGS=(--force --sign -)
 else
     echo "    mode: Developer ID — $SIGN_IDENTITY"
     SIGN_ARGS=(--force --options runtime --timestamp --sign "$SIGN_IDENTITY")
+    # BEAM JIT requires executable+writable memory. Without allow-jit the hardened
+    # runtime blocks mmap(MAP_JIT) and beam.smp crashes on first launch.
+    ENTITLEMENTS_PLIST="release/.entitlements.plist"
+    cat > "$ENTITLEMENTS_PLIST" <<ENTITLEMENTS_EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+</dict>
+</plist>
+ENTITLEMENTS_EOF
+    BUNDLE_SIGN_ARGS=(--force --options runtime --timestamp \
+        --entitlements "$ENTITLEMENTS_PLIST" --sign "$SIGN_IDENTITY")
 fi
 
 # Sign every nested Mach-O (ERTS executables, .so nifs, the bundled libcrypto)
 # BEFORE the bundle. This subsumes the crypto re-sign above and is what
 # notarization requires — Apple discourages --deep for distribution.
+#
+# beam.smp is the BEAM JIT compiler process — it must carry allow-jit itself.
+# macOS checks each process's own signature; the bundle entitlement alone
+# does not propagate to child processes.
 while IFS= read -r -d '' f; do
     if file "$f" | grep -q "Mach-O"; then
-        codesign "${SIGN_ARGS[@]}" "$f"
+        if [[ "$f" == */bin/beam.smp ]]; then
+            codesign "${BUNDLE_SIGN_ARGS[@]}" "$f"
+        else
+            codesign "${SIGN_ARGS[@]}" "$f"
+        fi
     fi
 done < <(find "$APP_BUNDLE/Contents/Resources" -type f -print0)
 
-# Native launcher, then the bundle itself, signed last.
+# Native launcher signed without entitlements (plain C binary, no JIT).
+# Bundle signed last with allow-jit entitlement.
 codesign "${SIGN_ARGS[@]}" "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
-codesign "${SIGN_ARGS[@]}" "$APP_BUNDLE"
+codesign "${BUNDLE_SIGN_ARGS[@]}" "$APP_BUNDLE"
 codesign -dv "$APP_BUNDLE" 2>&1 | head -3 || true
 
 # Notarize + staple the .app itself so it launches offline, even before the
