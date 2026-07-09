@@ -668,5 +668,115 @@ defmodule StockPlan.Ingestion.GlSilverTest do
       assert length(allocs) == 1
       assert Decimal.equal?(hd(allocs), Decimal.new("5"))
     end
+
+    test "T4-5: two ESPP purchase lots of EQUAL qty sold same date each map to their own G&L allocation (no false 'missing G&L')" do
+      account_id = "t4_5_#{:rand.uniform(99_999)}"
+
+      bh_ing =
+        TestFixtures.create_ingestion(%{
+          account_id: account_id,
+          category: "BENEFIT_HISTORY",
+          dominant_symbol: "ADBE"
+        })
+
+      # Same enrollment (Grant Date 01-JUL-2019), two distinct purchase lots,
+      # each sells qty 2 on the SAME date. Regression for the ESPP matcher that
+      # keyed only on (origin, sale_date, qty) and starved the second lot.
+      lots = [
+        {"31-DEC-2019", "12/31/2019", 0},
+        {"30-JUN-2020", "06/30/2020", 2}
+      ]
+
+      bh_rows =
+        Enum.flat_map(lots, fn {purchase_date_dmy, _purchase_date_mdy, base_idx} ->
+          grant_json =
+            Jason.encode!(%{
+              "Symbol" => "ADBE",
+              "Grant Date" => "01-JUL-2019",
+              "Purchase Date" => purchase_date_dmy,
+              "Purchase Price" => "100.00",
+              "Purchased Qty." => "10",
+              "Net Shares" => "10",
+              "Tax Collection Shares" => "0",
+              "Purchase Date FMV" => "120.00",
+              "Grant Date FMV" => "110.00",
+              "Discount Percent" => "15",
+              "Qualified Plan?" => "Y"
+            })
+
+          sell_json =
+            Jason.encode!(%{
+              "Symbol" => "ADBE",
+              "Date" => "09/26/2025",
+              "Event Type" => "SELL",
+              "Qty" => "2"
+            })
+
+          [
+            %BronzeRow{
+              sheet_name: "ESPP",
+              record_type: "Purchase",
+              row_index: base_idx,
+              parent_index: nil,
+              raw_row_json: grant_json,
+              row_hash: :crypto.hash(:sha256, grant_json <> "#{base_idx}") |> Base.encode16(case: :lower)
+            },
+            %BronzeRow{
+              sheet_name: "ESPP",
+              record_type: "Event",
+              row_index: base_idx + 1,
+              parent_index: base_idx,
+              raw_row_json: sell_json,
+              row_hash: :crypto.hash(:sha256, sell_json <> "#{base_idx}") |> Base.encode16(case: :lower)
+            }
+          ]
+        end)
+
+      {:ok, _} = BronzeWriter.write(bh_ing.ingestion_id, bh_rows)
+
+      gl_ing = TestFixtures.create_gl_ingestion(%{account_id: account_id})
+
+      espp_base = %{
+        "Symbol" => "ADBE",
+        "Plan Type" => "ESPP",
+        "Grant Number" => "--",
+        "Grant Date" => "07/01/2019",
+        "Vest Date" => nil,
+        "Date Sold" => "09/26/2025",
+        "Order Number" => "96328228",
+        "Proceeds Per Share" => "353.70",
+        "Quantity" => "2",
+        "Vest Date FMV" => nil
+      }
+
+      gl_rows = [
+        make_gl_bronze_row(Map.merge(espp_base, %{"Purchase Date" => "12/31/2019", "Date Acquired" => "12/31/2019"})),
+        make_gl_bronze_row(Map.merge(espp_base, %{"Purchase Date" => "06/30/2020", "Date Acquired" => "06/30/2020"}))
+      ]
+
+      {:ok, _} = BronzeWriter.write(gl_ing.ingestion_id, gl_rows)
+
+      {:ok, _} = SilverBuilder.build(account_id)
+
+      sales =
+        Repo.all(
+          from s in Sale,
+            where: s.account_id == ^account_id and s.sale_date == ^~D[2025-09-26],
+            select: s
+        )
+
+      assert length(sales) == 2
+
+      # Every sale must have exactly one PRICED G&L allocation — no starvation, no double-count.
+      priced_counts =
+        Enum.map(sales, fn s ->
+          Repo.aggregate(
+            from(a in SaleAllocation, where: a.sale_id == ^s.id and not is_nil(a.sale_price)),
+            :count
+          )
+        end)
+
+      assert priced_counts == [1, 1]
+    end
   end
 end

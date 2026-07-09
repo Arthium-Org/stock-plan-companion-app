@@ -655,7 +655,12 @@ defmodule StockPlan.Ingestion.SilverBuilder do
     with {:ok, origin} <- find_espp_origin(account_id, lot.tranche_key),
          {:ok, tranche} <- find_tranche_by_date(origin.id, lot.tranche_date) do
       alloc_created =
-        case find_bh_sale_espp(origin.id, lot.sale_date, lot.aggregated_quantity) do
+        case find_bh_sale_espp(
+               origin.id,
+               lot.sale_date,
+               lot.aggregated_quantity,
+               tranche.vest_date
+             ) do
           nil ->
             0
 
@@ -746,22 +751,55 @@ defmodule StockPlan.Ingestion.SilverBuilder do
     )
   end
 
-  # ESPP: match by origin + date + quantity
-  # Multiple ESPP purchase lots from same enrollment can be sold on the same date
-  defp find_bh_sale_espp(origin_id, sale_date, quantity) do
+  # ESPP: match by origin + date, disambiguated by the lot's purchase_date and quantity.
+  #
+  # ESPP creates one Sale per purchase-lot SELL event, so a single enrollment can have
+  # multiple Sales on the same date — sometimes with identical quantities (only the
+  # underlying purchase lot differs). Matching on quantity alone with limit: 1 would map
+  # every G&L lot to the same first Sale, starving the identical-quantity siblings and
+  # falsely flagging them as "missing G&L". Each BH ESPP Sale stores its lot's
+  # purchase_date in metadata_json (equal to the resolved tranche.vest_date), so we use
+  # it as the primary disambiguator, then quantity, then prefer a not-yet-allocated Sale.
+  defp find_bh_sale_espp(origin_id, sale_date, quantity, purchase_date) do
     qty_decimal = if quantity, do: Decimal.new(quantity), else: nil
+    pd_iso = purchase_date && Date.to_iso8601(purchase_date)
 
-    if qty_decimal do
-      Repo.one(
-        from s in Sale,
-          where:
-            s.origin_id == ^origin_id and s.sale_date == ^sale_date and
-              s.total_quantity == ^qty_decimal,
-          limit: 1
-      )
-    else
-      find_bh_sale(origin_id, sale_date)
+    Repo.all(
+      from s in Sale,
+        where: s.origin_id == ^origin_id and s.sale_date == ^sale_date,
+        order_by: [asc: s.id]
+    )
+    |> narrow(fn s -> is_nil(pd_iso) or sale_purchase_date(s) == pd_iso end)
+    |> narrow(fn s ->
+      is_nil(qty_decimal) or (s.total_quantity && Decimal.equal?(s.total_quantity, qty_decimal))
+    end)
+    |> Enum.sort_by(fn s -> if sale_has_gl_alloc?(s.id), do: 1, else: 0 end)
+    |> List.first()
+  end
+
+  # Apply a predicate but keep the original list when it would eliminate every candidate.
+  # Guards against regressions when a disambiguator (e.g. metadata purchase_date) is absent.
+  defp narrow(list, fun) do
+    case Enum.filter(list, fun) do
+      [] -> list
+      filtered -> filtered
     end
+  end
+
+  defp sale_purchase_date(%Sale{metadata_json: nil}), do: nil
+
+  defp sale_purchase_date(%Sale{metadata_json: json}) do
+    case Jason.decode(json) do
+      {:ok, %{"purchase_date" => pd}} -> pd
+      _ -> nil
+    end
+  end
+
+  defp sale_has_gl_alloc?(sale_id) do
+    Repo.exists?(
+      from a in SaleAllocation,
+        where: a.sale_id == ^sale_id and not is_nil(a.sale_price)
+    )
   end
 
   defp upsert_gl_allocation(sale, tranche, quantity, proceeds_per_share, order_number) do
