@@ -301,6 +301,8 @@ Links one sale to one or more source lots. Enables FIFO / specific-lot tax calcu
 | tranche_id | TEXT FK → tranches | on_delete: :restrict. Always populated (RSU/ESPP/ESOP). |
 | exercise_id | TEXT FK → exercises | on_delete: :restrict. Nullable. Populated only for ESOP. |
 | quantity | SafeDecimal | Shares consumed from this lot |
+| sale_price | SafeDecimal | Per-share price for this allocation. Nullable — nil for a BH placeholder allocation, set when a G&L row prices the lot. |
+| order_number | TEXT | Broker order/reference number from G&L. Nullable. Links allocation to its G&L row. |
 | timestamps() | :utc_datetime_usec | inserted_at + updated_at |
 
 **No polymorphic FKs.** All references are real DB-enforced foreign keys.
